@@ -2,16 +2,17 @@ package co.ledger.lama.bitcoin.worker.services
 
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.explorer.Block
-import io.circe.syntax._
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.utils.RabbitUtils
+import co.ledger.lama.common.utils.RabbitUtils.AutoAckMessage
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import fs2.Stream
+import io.circe.syntax._
 
 trait SyncEventService {
-  def consumeWorkerMessages: Stream[IO, WorkerMessage[Block]]
+  def consumeWorkerMessages: Stream[IO, AutoAckMessage[WorkerMessage[Block]]]
   def reportMessage(message: ReportMessage[Block]): IO[Unit]
 }
 
@@ -23,8 +24,8 @@ class RabbitSyncEventService(
 ) extends SyncEventService
     with IOLogging {
 
-  def consumeWorkerMessages: Stream[IO, WorkerMessage[Block]] =
-    RabbitUtils.createAutoAckConsumer[WorkerMessage[Block]](rabbitClient, workerQueueName)
+  def consumeWorkerMessages: Stream[IO, AutoAckMessage[WorkerMessage[Block]]] =
+    RabbitUtils.createConsumer[WorkerMessage[Block]](rabbitClient, workerQueueName)
 
   private val publisher: Stream[IO, ReportMessage[Block] => IO[Unit]] =
     RabbitUtils

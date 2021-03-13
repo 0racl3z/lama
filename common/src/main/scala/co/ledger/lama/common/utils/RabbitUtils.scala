@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 import cats.data.Kleisli
+import cats.effect.ExitCase.{Canceled, Completed, Error}
 import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import co.ledger.lama.common.logging.IOLogging
@@ -13,13 +14,34 @@ import dev.profunktor.fs2rabbit.config.deletion.{DeletionExchangeConfig, Deletio
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, deletion}
 import dev.profunktor.fs2rabbit.effects.MessageEncoder
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
-import dev.profunktor.fs2rabbit.model._
+import dev.profunktor.fs2rabbit.model.{AckResult, _}
 import fs2.Stream
 import io.circe.parser.parse
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder}
 
 object RabbitUtils extends IOLogging {
+
+  trait AutoAckMessage[A] {
+    def unwrap[B](consumer: A => IO[B]): IO[B]
+    def ack(): IO[Unit]
+    def nack(): IO[Unit]
+  }
+
+  object AutoAckMessage {
+    def apply[A](message: A, deliveryTag: DeliveryTag)(implicit acker: AckResult => IO[Unit]): AutoAckMessage[A] = {
+      new AutoAckMessage[A] {
+        override def unwrap[B](consumer: A => IO[B]): IO[B] = consumer(message).guaranteeCase {
+          case Completed => ack()
+          case _ => nack()
+        }
+
+        override def ack(): IO[Unit] = acker(AckResult.Ack(deliveryTag))
+
+        override def nack(): IO[Unit] = acker(AckResult.NAck(deliveryTag))
+      }
+    }
+  }
 
   def createClient(
       conf: Fs2RabbitConfig
@@ -139,16 +161,21 @@ object RabbitUtils extends IOLogging {
 
   def createConsumer[A](R: RabbitClient[IO], queueName: QueueName)(implicit
       d: Decoder[A]
-  ): Stream[IO, (AckResult => IO[Unit], A)] = {
+  ): Stream[IO, AutoAckMessage[A]] = {
     Stream
       .resource(R.createConnectionChannel)
       .evalMap { implicit channel =>
         R.createAckerConsumer[String](queueName)
       }
-      .flatMap { case (acker, consumer) =>
-        consumer.evalMap { message =>
+      .flatMap { case (acker, queue) =>
+        implicit val implicitAcker: AckResult => IO[Unit] = acker
+        queue.evalMap { message =>
           val parsed = parse(message.payload).flatMap(_.as[A])
-          IO.fromEither(parsed.map((acker, _)))
+
+          IO.fromEither(parsed.map(AutoAckMessage(_, message.deliveryTag))).guaranteeCase {
+            case Canceled | Error(_) => acker(AckResult.NAck(message.deliveryTag))
+            case Completed => IO.unit
+          }
         }
       }
   }

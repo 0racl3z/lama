@@ -1,11 +1,11 @@
 package co.ledger.lama.manager
 
 import cats.effect.{ContextShift, IO, Timer}
-import io.circe.syntax._
 import co.ledger.lama.common.logging.IOLogging
-import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
+import co.ledger.lama.common.utils.RabbitUtils
+import co.ledger.lama.common.utils.RabbitUtils.AutoAckMessage
 import co.ledger.lama.manager.config.CoinConfig
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -14,6 +14,7 @@ import doobie.implicits._
 import doobie.util.transactor.Transactor
 import fs2.{Pipe, Stream}
 import io.circe.JsonObject
+import io.circe.syntax._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -33,11 +34,11 @@ trait SyncEventTask {
     tickerStream(tick, stopAtNbTick) >> publishableWorkerMessages.through(publishWorkerMessagePipe)
 
   // Source of report messages to report.
-  def reportableMessages: Stream[IO, ReportMessage[JsonObject]]
+  def reportableMessages: Stream[IO, AutoAckMessage[ReportMessage[JsonObject]]]
 
   // Report events pipe transformation:
   // Stream[IO, ReportMessage[JsonObject]] => Stream[IO, Unit].
-  def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit]
+  def reportMessagePipe: Pipe[IO, AutoAckMessage[ReportMessage[JsonObject]], Unit]
 
   // Source reportable messages then report the event of messages.
   def reportMessages: Stream[IO, Unit] =
@@ -105,19 +106,22 @@ class CoinSyncEventTask(
     }
 
   // Consume messages to report from the events exchange queue.
-  def reportableMessages: Stream[IO, ReportMessage[JsonObject]] =
+  def reportableMessages: Stream[IO, AutoAckMessage[ReportMessage[JsonObject]]] =
     RabbitUtils
-      .createAutoAckConsumer[ReportMessage[JsonObject]](
+      .createConsumer[ReportMessage[JsonObject]](
         rabbit,
         conf.queueName(eventsExchangeName)
       )
 
   // Insert reportable events in database and publish next pending event.
-  def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit] =
-    _.evalMap { message =>
-      Queries.insertSyncEvent(message.event).transact(db).void *>
-        publisher.dequeue(message.account.id) *>
-        log.info(s"Reported message: ${message.asJson.toString}")
+  def reportMessagePipe: Pipe[IO, AutoAckMessage[ReportMessage[JsonObject]], Unit] =
+    _.evalMap { autoAckMessage =>
+      autoAckMessage.unwrap {
+        message =>
+          Queries.insertSyncEvent(message.event).transact(db).void *>
+            publisher.dequeue(message.account.id) *>
+            log.info(s"Reported message: ${message.asJson.toString}")
+      }
     }
 
   // Fetch triggerable events from database.
