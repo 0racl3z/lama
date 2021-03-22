@@ -120,6 +120,7 @@ class OperationService(
       hash = emptyOperation.op.hash.hex,
       transaction = TransactionView(
         id = emptyOperation.tx.id,
+        rawHex = emptyOperation.tx.rawHex.hex,
         hash = emptyOperation.tx.hash.hex,
         receivedAt = emptyOperation.tx.receivedAt,
         lockTime = emptyOperation.tx.lockTime,

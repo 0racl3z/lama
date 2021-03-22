@@ -104,7 +104,7 @@ object Bookkeeper {
         val txs           = trs.map(_.tx).toList
         val usedAddresses = trs.map(_.usedAddresses).toList.flatten
 
-        val maxBlock = txs.collect { case ConfirmedTransaction(_, _, _, _, _, _, _, block, _) =>
+        val maxBlock = txs.collect { case ConfirmedTransaction(_, _, _, _, _, _, _, _, block, _) =>
           block
         }.maxOption
 

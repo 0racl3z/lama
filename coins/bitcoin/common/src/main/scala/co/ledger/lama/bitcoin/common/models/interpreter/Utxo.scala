@@ -10,6 +10,7 @@ import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 
 case class Utxo(
+    transactionRawHex: String,
     transactionHash: String,
     outputIndex: Int,
     value: BigInt,
@@ -17,10 +18,12 @@ case class Utxo(
     scriptHex: String,
     changeType: Option[ChangeType],
     derivation: NonEmptyList[Int],
+    publicKey: String,
     time: Instant
 ) {
   def toProto: protobuf.Utxo =
     protobuf.Utxo(
+      transactionRawHex,
       transactionHash,
       outputIndex,
       value.toString,
@@ -28,6 +31,7 @@ case class Utxo(
       scriptHex,
       changeType.getOrElse(ChangeType.External).toProto,
       derivation.toList,
+      publicKey,
       Some(TimestampProtoUtils.serialize(time))
     )
 }
@@ -38,6 +42,7 @@ object Utxo {
 
   def fromProto(proto: protobuf.Utxo): Utxo =
     Utxo(
+      proto.transactionRawHex,
       proto.transactionHash,
       proto.outputIndex,
       BigInt(proto.value),
@@ -45,6 +50,7 @@ object Utxo {
       proto.scriptHex,
       Some(ChangeType.fromProto(proto.changeType)),
       NonEmptyList.fromListUnsafe(proto.derivation.toList),
+      proto.publicKey,
       proto.time.map(TimestampProtoUtils.deserialize).getOrElse(Instant.now())
     )
 }

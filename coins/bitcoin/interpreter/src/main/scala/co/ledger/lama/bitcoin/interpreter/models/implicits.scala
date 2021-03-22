@@ -36,10 +36,11 @@ object implicits {
 
   implicit lazy val readTransactionView: Read[TransactionView] =
     Read[
-      (String, String, Option[String], Option[Long], Option[Instant], Instant, Long, BigInt, Int)
+      (String, String, String, Option[String], Option[Long], Option[Instant], Instant, Long, BigInt, Int)
     ].map {
       case (
             id,
+            rawHex,
             hash,
             blockHashO,
             blockHeightO,
@@ -51,6 +52,7 @@ object implicits {
           ) =>
         TransactionView(
           id = id,
+          rawHex = rawHex,
           hash = hash,
           receivedAt = receivedAt,
           lockTime = lockTime,
@@ -81,10 +83,10 @@ object implicits {
     }
 
   implicit lazy val readUtxos: Read[Utxo] =
-    Read[(String, Int, BigInt, String, String, Option[ChangeType], NonEmptyList[Int], Instant)]
+    Read[(String, String, Int, BigInt, String, String, Option[ChangeType], NonEmptyList[Int], String, Instant)]
       .map {
-        case (hash, outputIndex, value, address, scriptHex, changeType, derivation, blockTime) =>
-          Utxo(hash, outputIndex, value, address, scriptHex, changeType, derivation, blockTime)
+        case (rawHex, hash, outputIndex, value, address, scriptHex, changeType, derivation, publicKey, blockTime) =>
+          Utxo(rawHex, hash, outputIndex, value, address, scriptHex, changeType, derivation, publicKey, blockTime)
       }
 
 }

@@ -22,6 +22,24 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   private val inputAddress =
     AccountAddress("1LD1pARePgXXyZA1J3EyvRtB82vxENs5wQ", ChangeType.External, NonEmptyList.of(1, 1))
 
+    val transaction1Hash = "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f"
+    val transaction1Hex =
+      """|010000000186836e3ba5939990e7b66b09e6cf74d6f37ad7e0c6809e5a497820b1f1e5380f00000000
+         |6b483045022100f373bb5c9ad2ab5e571571911df1476bf81529efdc6ec984149984ed86d133460220
+         |295f37d506dff4568b81c6a1e1621ec34f6356752ce047c80adcc4010d62ed9c0121033d167e565dc1
+         |4269dc967c1e116be087853c97bb3ccede19ed6fc799187edf0dffffffff0250c30000000000001976
+         |a9148d73eed105d131064de320163eaf3185a51be78488acda240000000000001976a914d3d81e22c6
+         |06ee3d4188ab572c13e8f4f76ae0b988ac24b30800""".stripMargin.replaceAll("\n", "")
+
+  val transaction2Hash = "b0c0dc176eaf463a5cecf15f1f55af99a41edfd6e01685068c0db3cc779861c8"
+  val transaction2Hex =
+    """|0100000001bcea140e91a19ab5eb26e5e46a02fea9fc7aa8519af049ade8d13abaff9d2ab3010000006b
+       |483045022100f537b099d8d71f84cba4ae74a1a764d281c3e2530a3156de82bbaf0dbfb70f1302206d1e
+       |b869625a726ef2439101ee2956839b6d830399507e86e3fe72fe042ba3ca012103803503d4b69fd86301
+       |3edbd4eec9a491e8dd1df571adcac26922209ed85dea66ffffffff0224020000000000001976a91496f9
+       |05187d8709f373b73e1f340713bb999de36e88ac05540e00000000001976a91468bbecdb75fbe0da1e18
+       |90faec98aee7cdec7e1188ac9cee0900""".stripMargin.replaceAll("\n", "")
+
   val block1: BlockView = BlockView(
     "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379",
     570153,
@@ -56,7 +74,8 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   val insertTx1: TransactionView =
     TransactionView(
       "txId1",
-      "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
+      transaction1Hex,
+      transaction1Hash,
       Instant.parse("2019-04-04T10:03:22Z"),
       0,
       20566,
@@ -69,7 +88,8 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   val insertTx2: TransactionView =
     TransactionView(
       "txId2",
-      "b0c0dc176eaf463a5cecf15f1f55af99a41edfd6e01685068c0db3cc779861c8",
+      transaction2Hex,
+      transaction2Hash,
       Instant.parse("2019-04-04T10:03:22Z"),
       0,
       30566,
@@ -251,6 +271,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
         val unconfirmedTransaction1 = TransactionView(
           "txId1",
+          "txHexUnconfirmed1",
           "txHash1",
           Instant.now,
           0L,
@@ -284,6 +305,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
         val unconfirmedTransaction2 = TransactionView(
           "txId2",
+          "txHexUnconfirmed2",
           "txHash2",
           Instant.now,
           0L,

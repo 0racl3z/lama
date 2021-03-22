@@ -17,6 +17,7 @@ import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfigur
 
 sealed trait Transaction {
   val id: String
+  val rawHex: String
   val hash: String
   val receivedAt: Instant
   val lockTime: Long
@@ -42,6 +43,7 @@ object Transaction {
 
 case class ConfirmedTransaction(
     id: String,
+    rawHex: String,
     hash: String,
     receivedAt: Instant,
     lockTime: Long,
@@ -54,6 +56,7 @@ case class ConfirmedTransaction(
   def toProto: protobuf.Transaction =
     protobuf.Transaction(
       id,
+      rawHex,
       hash,
       Some(TimestampProtoUtils.serialize(receivedAt)),
       lockTime,
@@ -67,6 +70,7 @@ case class ConfirmedTransaction(
   def toTransactionView: TransactionView =
     TransactionView(
       id,
+      rawHex,
       hash,
       receivedAt,
       lockTime,
@@ -115,6 +119,7 @@ object ConfirmedTransaction {
   def fromProto(proto: protobuf.Transaction): ConfirmedTransaction =
     ConfirmedTransaction(
       proto.id,
+      proto.rawHex,
       proto.hash,
       proto.receivedAt.map(TimestampProtoUtils.deserialize).getOrElse(Instant.now),
       proto.lockTime,
@@ -130,6 +135,7 @@ object ConfirmedTransaction {
 
 case class UnconfirmedTransaction(
     id: String,
+    rawHex: String,
     hash: String,
     receivedAt: Instant,
     lockTime: Long,
@@ -142,6 +148,7 @@ case class UnconfirmedTransaction(
   def toTransactionView: TransactionView =
     TransactionView(
       id,
+      rawHex,
       hash,
       receivedAt,
       lockTime,
@@ -184,6 +191,7 @@ object UnconfirmedTransaction {
   def fromProto(proto: protobuf.Transaction): UnconfirmedTransaction =
     UnconfirmedTransaction(
       proto.id,
+      proto.rawHex,
       proto.hash,
       proto.receivedAt.map(TimestampProtoUtils.deserialize).getOrElse(Instant.now),
       proto.lockTime,

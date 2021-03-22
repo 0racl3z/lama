@@ -10,6 +10,7 @@ import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfigur
 
 case class TransactionView(
     id: String,
+    rawHex: String,
     hash: String,
     receivedAt: Instant,
     lockTime: Long,
@@ -22,6 +23,7 @@ case class TransactionView(
   def toProto: protobuf.TransactionView =
     protobuf.TransactionView(
       id,
+      rawHex,
       hash,
       Some(TimestampProtoUtils.serialize(receivedAt)),
       lockTime,
@@ -40,6 +42,7 @@ object TransactionView {
   def fromProto(proto: protobuf.TransactionView): TransactionView =
     TransactionView(
       proto.id,
+      proto.rawHex,
       proto.hash,
       proto.receivedAt.map(TimestampProtoUtils.deserialize).getOrElse(Instant.now),
       proto.lockTime,

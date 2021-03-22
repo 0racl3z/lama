@@ -45,6 +45,13 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
     val accountId = UUID.randomUUID()
 
     val transactionHash = "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f"
+    val transactionHex =
+      """|010000000186836e3ba5939990e7b66b09e6cf74d6f37ad7e0c6809e5a497820b1f1e5380f00000000
+         |6b483045022100f373bb5c9ad2ab5e571571911df1476bf81529efdc6ec984149984ed86d133460220
+         |295f37d506dff4568b81c6a1e1621ec34f6356752ce047c80adcc4010d62ed9c0121033d167e565dc1
+         |4269dc967c1e116be087853c97bb3ccede19ed6fc799187edf0dffffffff0250c30000000000001976
+         |a9148d73eed105d131064de320163eaf3185a51be78488acda240000000000001976a914d3d81e22c6
+         |06ee3d4188ab572c13e8f4f76ae0b988ac24b30800""".stripMargin.replaceAll("\n", "")
 
     val outputAddress1 = AccountAddress(
       "1DtwACvd338XtHBFYJRVKRLxviD7YtYADa",
@@ -78,6 +85,7 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
     val transactions = List(
       TransactionView(
         transactionHash,
+        transactionHex,
         transactionHash,
         Instant.parse("2019-04-04T10:03:22Z"),
         0,
@@ -123,6 +131,7 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
     } yield {
       response.hex should have size 3
       response.hex should be("hex")
+      response.utxos.head.transactionRawHex should be(transactionHex)
     }
   }
 

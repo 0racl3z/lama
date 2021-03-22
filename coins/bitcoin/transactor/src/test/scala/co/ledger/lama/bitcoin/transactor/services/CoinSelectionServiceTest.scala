@@ -14,6 +14,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
   "A depthFirst Strategy" should "return oldest utxos first" in {
 
     val utxo = Utxo(
+      "also long hex",
       "hash",
       0,
       100000,
@@ -21,6 +22,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
       "script",
       Some(ChangeType.Internal),
       NonEmptyList.of(0, 1),
+      "another change pubkey",
       Instant.now
     )
 
@@ -42,6 +44,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
   it should "be in error if it goes beyond 10 utxos" in {
 
     val utxo = Utxo(
+      "shorter hex maybe",
       "hash",
       0,
       1000,
@@ -49,6 +52,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
       "script",
       Some(ChangeType.Internal),
       NonEmptyList.of(0, 1),
+      "again a change pubkey",
       Instant.now
     )
 
@@ -74,6 +78,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
   "A optimizeSize Strategy" should "get biggest utxos first" in {
 
     val utxo = Utxo(
+      "hex again",
       "hash",
       0,
       1000,
@@ -81,6 +86,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
       "script",
       Some(ChangeType.Internal),
       NonEmptyList.of(0, 1),
+      "pubkey again",
       Instant.now
     )
 
@@ -111,6 +117,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
   "A mergeOutputs Strategy" should "only aggregate small utxos" in {
 
     val utxo = Utxo(
+      "long hex",
       "hash",
       0,
       1000,
@@ -118,6 +125,7 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
       "script",
       Some(ChangeType.Internal),
       NonEmptyList.of(0, 1),
+      "a change pubkey",
       Instant.now
     )
 

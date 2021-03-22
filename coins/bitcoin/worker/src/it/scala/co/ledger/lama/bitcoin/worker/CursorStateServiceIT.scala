@@ -86,6 +86,7 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging 
   private def createTx(blockHash: String, height: Long) =
     TransactionView(
       "id",
+      "raw_hex",
       "hash",
       Instant.now(),
       0L,

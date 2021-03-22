@@ -63,7 +63,7 @@ class InterpreterClientMock extends InterpreterClient {
 
   def getLastBlocks(accountId: UUID): IO[List[BlockView]] = {
     val lastBlocks: List[BlockView] = savedTransactions(accountId)
-      .collect { case TransactionView(_, _, _, _, _, _, _, Some(block), _) =>
+      .collect { case TransactionView(_, _, _, _, _, _, _, _, Some(block), _) =>
         BlockView(
           block.hash,
           block.height,
@@ -213,6 +213,7 @@ class InterpreterClientMock extends InterpreterClient {
       )
       .map { case (tx, output) =>
         Utxo(
+          tx.rawHex,
           tx.hash,
           output.outputIndex,
           output.value,
@@ -220,6 +221,7 @@ class InterpreterClientMock extends InterpreterClient {
           output.scriptHex,
           output.changeType,
           output.derivation.get,
+          "NotAPk",
           tx.block.map(_.time).getOrElse(Instant.now())
         )
       }

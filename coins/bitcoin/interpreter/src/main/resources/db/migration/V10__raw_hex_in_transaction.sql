@@ -1,0 +1,1 @@
+ALTER TABLE transaction ADD COLUMN raw_hex VARCHAR NOT NULL default 'INVALID';

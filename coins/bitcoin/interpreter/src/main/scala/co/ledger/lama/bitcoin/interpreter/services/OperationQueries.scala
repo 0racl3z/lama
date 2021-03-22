@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.models.{OperationToSave, TransactionAmounts}
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
 import co.ledger.lama.common.logging.DoobieLogHandler
-import co.ledger.lama.common.models.{Sort, TxHash}
+import co.ledger.lama.common.models.{Sort, TxHash, HexString}
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
@@ -19,8 +19,12 @@ object OperationQueries extends DoobieLogHandler {
   implicit val txHashRead: Read[TxHash]   = Read[String].map(TxHash.apply)
   implicit val txHashWrite: Write[TxHash] = Write[String].contramap(_.hex)
 
+  implicit val hexStringRead: Read[HexString]   = Read[String].map(HexString.apply)
+  implicit val hexStringWrite: Write[HexString] = Write[String].contramap(_.hex.toLowerCase)
+
   case class Tx(
       id: String,
+      rawHex: HexString,
       hash: TxHash,
       receivedAt: Instant,
       lockTime: Long,

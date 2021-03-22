@@ -8,14 +8,15 @@ option java_package = "co.ledger.lama.bitcoin.interpreter.protobuf";
 
 message Transaction {
   string id = 1;
-  string hash = 2;
-  google.protobuf.Timestamp received_at = 3;
-  int64 lock_time = 4;
-  string fees = 5;
-  repeated Input inputs = 6;
-  repeated Output outputs = 7;
-  Block block = 8;
-  int32 confirmations = 9;
+  string raw_hex = 2;
+  string hash = 3;
+  google.protobuf.Timestamp received_at = 4;
+  int64 lock_time = 5;
+  string fees = 6;
+  repeated Input inputs = 7;
+  repeated Output outputs = 8;
+  Block block = 9;
+  int32 confirmations = 10;
 }
 
 message Input {

@@ -37,7 +37,8 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   val tx1: TransactionView =
     TransactionView(
       "txId1",
-      "txId1",
+      "txHex1",
+      "txHash1",
       time,
       0,
       0,
@@ -54,7 +55,8 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   val tx2: TransactionView =
     TransactionView(
       "txId2",
-      "txId2",
+      "txHex2",
+      "txHash2",
       time,
       0,
       566,
@@ -83,7 +85,8 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   val tx3: TransactionView =
     TransactionView(
       "txId3",
-      "txId3",
+      "txHex3",
+      "txHash3",
       time,
       0,
       500,
@@ -111,7 +114,8 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   val unconfirmedTx: TransactionView =
     TransactionView(
       "unconfirmedTx",
-      "unconfirmedTx",
+      "unconfirmedTxHex",
+      "unconfirmedTxHash",
       time,
       0,
       500,

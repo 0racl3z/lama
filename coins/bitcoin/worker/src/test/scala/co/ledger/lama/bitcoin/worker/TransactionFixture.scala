@@ -69,6 +69,7 @@ object TransactionFixture {
       outputs: NonEmptyList[Output]
   ): UnconfirmedTransaction = UnconfirmedTransaction(
     id = s"id-${Random.nextInt(100)}",
+    rawHex = "very long hex",
     hash = s"hash${Random.nextInt(6)}",
     receivedAt = Instant.now(),
     lockTime = 0L,
@@ -84,6 +85,7 @@ object TransactionFixture {
       block: Block
   ): ConfirmedTransaction = ConfirmedTransaction(
     id = s"id-${Random.nextInt(100) + 100}",
+    rawHex = "very long hex",
     hash = s"hash${Random.nextInt(6) + 6}",
     receivedAt = Instant.now(),
     lockTime = 0L,

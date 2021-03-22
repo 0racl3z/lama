@@ -26,6 +26,15 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
   private val time: Instant = Instant.parse("2019-04-04T10:03:22Z")
 
+    val transaction1Hash = "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f"
+    val transaction1Hex =
+      """|010000000186836e3ba5939990e7b66b09e6cf74d6f37ad7e0c6809e5a497820b1f1e5380f00000000
+         |6b483045022100f373bb5c9ad2ab5e571571911df1476bf81529efdc6ec984149984ed86d133460220
+         |295f37d506dff4568b81c6a1e1621ec34f6356752ce047c80adcc4010d62ed9c0121033d167e565dc1
+         |4269dc967c1e116be087853c97bb3ccede19ed6fc799187edf0dffffffff0250c30000000000001976
+         |a9148d73eed105d131064de320163eaf3185a51be78488acda240000000000001976a914d3d81e22c6
+         |06ee3d4188ab572c13e8f4f76ae0b988ac24b30800""".stripMargin.replaceAll("\n", "")
+
   val block: BlockView = BlockView(
     "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379",
     570153,
@@ -52,7 +61,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   val insertTx: TransactionView =
     TransactionView(
       "txId",
-      "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
+      transaction1Hex,
+      transaction1Hash,
       time,
       0,
       20566,
@@ -86,8 +96,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _ <- interpreter.saveTransactions(
             accountId,
             List(
-              insertTx.copy(hash = "toto", block = Some(block2)),
-              insertTx.copy(hash = "tata", block = Some(block3))
+              insertTx.copy(rawHex = "totoHex", hash = "toto", block = Some(block2)),
+              insertTx.copy(rawHex = "tataHex", hash = "tata", block = Some(block3))
             )
           )
 
@@ -181,7 +191,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         val uTx = TransactionView(
           "txId",
-          "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
+          transaction1Hex,
+          transaction1Hash,
           time,
           0,
           20566,
@@ -192,6 +203,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         )
         val uTx2 = uTx.copy(
           id = "txId2",
+          rawHex = "txHex2",
           hash = "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1e"
         )
 
@@ -227,7 +239,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         val uTx = TransactionView(
           "txId",
-          "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
+          transaction1Hex,
+          transaction1Hash,
           time,
           0,
           20566,
@@ -239,7 +252,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         val tx = TransactionView(
           "txId",
-          "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
+          transaction1Hex,
+          transaction1Hash,
           time,
           0,
           20566,
@@ -272,8 +286,9 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx1 = TransactionView(
-          "tx1",
-          "tx1",
+          "unconfirmedTxToo1Id",
+          "unconfirmedTxToo1Hex",
+          "unconfirmedTxToo1Hash",
           time,
           0,
           1000,
@@ -288,16 +303,18 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         )
 
         val uTx2 = uTx1.copy(
-          id = "tx2",
-          hash = "tx2",
+          id = "tox2Id",
+          rawHex = "tox2Hex",
+          hash = "tox2Hash",
           outputs = List(
             OutputView(0, 5000, outputAddress2.accountAddress, "script", None, None)
           ) // receive
         )
 
         val uTx3 = uTx1.copy(
-          id = "tx3",
-          hash = "tx3",
+          id = "tix3Id",
+          rawHex = "tix3Hex",
+          hash = "tix3Hash",
           inputs = List(
             InputView(
               "tx1",
