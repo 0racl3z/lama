@@ -15,7 +15,34 @@ import io.circe.{Decoder, Encoder}
 import io.circe.syntax._
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 
-sealed trait Transaction {
+case class TxHashWithHex(val transactionHash: String, val hex: String) {
+ implicit val encoder: Encoder[TxHashWithHex] =
+   deriveConfiguredEncoder[TxHashWithHex]
+
+ implicit val decoder: Decoder[TxHashWithHex] =
+   deriveConfiguredDecoder[TxHashWithHex]
+}
+
+case class ExplorerTransaction (
+  val id: String,
+  val hash: String,
+  val receivedAt: Instant,
+  val lockTime: Long,
+  val fees: BigInt,
+  val inputs: Seq[Input],
+  val outputs: Seq[Output],
+  val block: Option[Block],
+  val confirmations: Int
+) {
+
+ implicit val encoder: Encoder[ExplorerTransaction] =
+   deriveConfiguredEncoder[ExplorerTransaction]
+
+ implicit val decoder: Decoder[ExplorerTransaction] =
+   deriveConfiguredDecoder[ExplorerTransaction]
+}
+
+sealed trait TransactionWithHex {
   val id: String
   val rawHex: String
   val hash: String
@@ -29,18 +56,6 @@ sealed trait Transaction {
   def toTransactionView: TransactionView
 }
 
-object Transaction {
-  implicit val encoder: Encoder[Transaction] =
-    Encoder.instance {
-      case confirmedTx: ConfirmedTransaction     => confirmedTx.asJson
-      case unconfirmedTx: UnconfirmedTransaction => unconfirmedTx.asJson
-    }
-
-  implicit val decoder: Decoder[Transaction] = Decoder[ConfirmedTransaction]
-    .map[Transaction](identity)
-    .or(Decoder[UnconfirmedTransaction].map[Transaction](identity))
-}
-
 case class ConfirmedTransaction(
     id: String,
     rawHex: String,
@@ -52,7 +67,7 @@ case class ConfirmedTransaction(
     outputs: Seq[Output],
     block: Block,
     confirmations: Int
-) extends Transaction {
+) extends TransactionWithHex {
   def toProto: protobuf.Transaction =
     protobuf.Transaction(
       id,
@@ -143,7 +158,7 @@ case class UnconfirmedTransaction(
     inputs: Seq[Input],
     outputs: Seq[Output],
     confirmations: Int
-) extends Transaction {
+) extends TransactionWithHex {
 
   def toTransactionView: TransactionView =
     TransactionView(

@@ -66,10 +66,11 @@ object TransactionQueries extends DoobieLogHandler {
     val noUpdate = fr"""DO NOTHING"""
 
     val query = sql"""INSERT INTO transaction (
-            account_id, id, hash, block_hash, block_height, block_time, received_at, lock_time, fees, confirmations
+            account_id, id, raw_hex, hash, block_hash, block_height, block_time, received_at, lock_time, fees, confirmations
           ) VALUES (
             $accountId,
             ${tx.id},
+            ${tx.rawHex},
             ${tx.hash},
             ${tx.block.map(_.hash)},
             ${tx.block.map(_.height)},

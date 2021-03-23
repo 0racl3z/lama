@@ -89,6 +89,10 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
   def getBlock(height: Long): IO[Block] =
     callExpect[Block](conf.uri.withPath(s"$coinBasePath/blocks/$height"))
 
+  private def GetRawHexRequest(thHash: String): IO[String] = {
+    callExpect[TxHashWithHex](conf.uri.withPath(s"$coinBasePath/transactions/$txHash/hex")).map(_.hex)
+  }
+
   def getConfirmedTransactions(
       addresses: Seq[Address],
       blockHash: Option[String]
@@ -193,7 +197,6 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
         case None        => baseUri
       }
     )
-
   }
 
   private def fetchPaginatedTransactions(
@@ -208,7 +211,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
       .eval(
         log.info(
           s"Getting txs with block_hash=$blockHash for addresses: ${addresses.mkString(",")}"
-        ) *>
+        ).attempt *>
           IOUtils.retry(
             callExpect[GetTransactionsResponse](GetOperationsRequest(addresses, blockHash))
               .timeout(conf.timeout)

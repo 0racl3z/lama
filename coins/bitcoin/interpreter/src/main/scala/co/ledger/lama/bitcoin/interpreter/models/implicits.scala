@@ -11,6 +11,7 @@ import doobie.postgres.implicits._
 import doobie.implicits.javasql._
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import co.ledger.lama.common.models.HexString
 
 object implicits {
 
@@ -36,7 +37,7 @@ object implicits {
 
   implicit lazy val readTransactionView: Read[TransactionView] =
     Read[
-      (String, String, String, Option[String], Option[Long], Option[Instant], Instant, Long, BigInt, Int)
+      (String, HexString, HexString, Option[String], Option[Long], Option[Instant], Instant, Long, BigInt, Int)
     ].map {
       case (
             id,
@@ -52,8 +53,8 @@ object implicits {
           ) =>
         TransactionView(
           id = id,
-          rawHex = rawHex,
-          hash = hash,
+          rawHex = rawHex.hex,
+          hash = hash.hex,
           receivedAt = receivedAt,
           lockTime = lockTime,
           fees = fees,
