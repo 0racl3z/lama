@@ -925,6 +925,9 @@ components:
           example: '001461d9e81c1e1a5f750fbd8b8b56557fbe96a00e49'
         derivation:
           $ref: '#/components/schemas/Derivation'
+        public_key:
+          type: string
+          example: '03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a'
         change_type:
           $ref: '#/components/schemas/ChangeType'
         used_in_mempool:

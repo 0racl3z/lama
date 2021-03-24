@@ -1,6 +1,5 @@
 package co.ledger.lama.bitcoin.api.models
 
-import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor.{
   CoinSelectionStrategy,
   FeeLevel,
@@ -10,6 +9,7 @@ import co.ledger.lama.bitcoin.common.models.transactor.{
 import co.ledger.lama.common.models.implicits._
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto._
+import co.ledger.lama.bitcoin.common.models
 
 object transactor {
 
@@ -28,6 +28,36 @@ object transactor {
       deriveConfiguredDecoder[CreateTransactionRequest]
   }
 
+  case class CreateTransactionResponse(
+      hex: String,
+      hash: String,
+      witnessHash: String,
+      utxos: List[SpendableTxo],
+      fee: Long,
+      feePerKb: Long
+  )
+
+  object CreateTransactionResponse {
+    implicit val encoder: Encoder[CreateTransactionResponse] =
+      deriveConfiguredEncoder[CreateTransactionResponse]
+    implicit val decoder: Decoder[CreateTransactionResponse] =
+      deriveConfiguredDecoder[CreateTransactionResponse]
+
+    def fromCommon(
+        resp: models.transactor.CreateTransactionResponse,
+        utxosList: List[SpendableTxo]
+    ): CreateTransactionResponse =
+      CreateTransactionResponse(
+        resp.hex,
+        resp.hash,
+        resp.witnessHash,
+        utxosList,
+        resp.fee,
+        resp.feePerKb
+      )
+
+  }
+
   case class BroadcastTransactionRequest(
       rawTransaction: RawTransaction,
       derivations: List[List[Int]],
@@ -43,7 +73,7 @@ object transactor {
 
   case class GenerateSignaturesRequest(
       rawTransaction: RawTransaction,
-      utxos: List[Utxo],
+      utxos: List[SpendableTxo],
       privKey: String
   )
 

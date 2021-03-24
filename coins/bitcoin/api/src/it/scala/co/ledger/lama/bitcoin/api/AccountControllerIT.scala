@@ -4,6 +4,7 @@ import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.ConfigSpec.ConfigSpec
 import co.ledger.lama.bitcoin.api.models.accountManager._
+import co.ledger.lama.bitcoin.api.{models => apiModels}
 import co.ledger.lama.bitcoin.api.routes.ValidationResult
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.Notification.BalanceUpdated
@@ -190,9 +191,9 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               .getOrElse(IO.none[Operation])
 
             utxos <- IOUtils
-              .fetchPaginatedItems[GetUtxosResult](
+              .fetchPaginatedItems[apiModels.GetUtxosResult](
                 (offset, limit) =>
-                  client.expect[GetUtxosResult](
+                  client.expect[apiModels.GetUtxosResult](
                     getUTXOsRequest(accountRegistered.accountId, offset, limit, Sort.Ascending)
                   ),
                 _.truncated,

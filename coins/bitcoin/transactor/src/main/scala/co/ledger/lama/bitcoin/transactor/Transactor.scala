@@ -210,8 +210,9 @@ class Transactor(
       _ <-
         if (retryCount <= 0)
           IO.raiseError(
+            // TODO: Add back the utxos in the exception. With a show instance ?
+            //  utxos : ${utxos.asJson}
             new Exception(s"""Impossible to create raw transaction satisfying criterias :
-                utxos : ${utxos.asJson}
                 outputs: ${outputs.asJson}
                 estimatedFeeSatPerKb: $estimatedFeeSatPerKb
               """)

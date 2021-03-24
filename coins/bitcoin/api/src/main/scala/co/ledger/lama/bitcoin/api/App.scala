@@ -61,17 +61,19 @@ object App extends IOApp {
       )
 
       val accountManager = new AccountManagerGrpcClient(res.accountManagerGrpcChannel)
+      val keychainClient = new KeychainGrpcClient(res.keychainGrpcChannel)
 
       val httpRoutes = Router[IO](
         "accounts" -> CORS(
           loggingMiddleWare(
             AccountController
               .routes(
-                new KeychainGrpcClient(res.keychainGrpcChannel),
+                keychainClient,
                 accountManager,
                 new InterpreterGrpcClient(res.interpreterGrpcChannel)
               ) <+> AccountController
               .transactionsRoutes(
+                keychainClient,
                 accountManager,
                 new TransactorGrpcClient(res.transactorGrpcChannel)
               )

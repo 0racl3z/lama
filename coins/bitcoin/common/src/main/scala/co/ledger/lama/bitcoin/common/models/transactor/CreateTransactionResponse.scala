@@ -1,10 +1,7 @@
 package co.ledger.lama.bitcoin.common.models.transactor
 
-import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.transactor.protobuf
-import io.circe.{Decoder, Encoder}
-import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 
 case class CreateTransactionResponse(
     hex: String,
@@ -28,11 +25,6 @@ case class CreateTransactionResponse(
 }
 
 object CreateTransactionResponse {
-  implicit val encoder: Encoder[CreateTransactionResponse] =
-    deriveConfiguredEncoder[CreateTransactionResponse]
-  implicit val decoder: Decoder[CreateTransactionResponse] =
-    deriveConfiguredDecoder[CreateTransactionResponse]
-
   def fromProto(proto: protobuf.CreateTransactionResponse): CreateTransactionResponse =
     CreateTransactionResponse(
       proto.hex,

@@ -7,6 +7,7 @@ import cats.implicits._
 import co.ledger.lama.bitcoin.api.models.BalancePreset
 import co.ledger.lama.bitcoin.api.models.accountManager._
 import co.ledger.lama.bitcoin.api.models.transactor._
+import co.ledger.lama.bitcoin.api.{models => apiModels}
 import co.ledger.lama.bitcoin.api.utils.RouterUtils._
 import co.ledger.lama.bitcoin.common.clients.grpc.{
   InterpreterClient,
@@ -34,6 +35,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
   implicit val cs: ContextShift[IO] = IO.contextShift(scala.concurrent.ExecutionContext.global)
 
   def transactionsRoutes(
+      keychainClient: KeychainClient,
       accountManagerClient: AccountManagerClient,
       transactorClient: TransactorClient
   ): HttpRoutes[IO] = HttpRoutes.of[IO] {
@@ -42,27 +44,32 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
     case req @ POST -> Root / UUIDVar(
           accountId
         ) / "transactions" =>
-      for {
-        _                        <- log.info(s"Preparing transaction creation for account: $accountId")
-        createTransactionRequest <- req.as[CreateTransactionRequest]
+      (for {
+        _                           <- log.info(s"Preparing transaction creation for account: $accountId")
+        apiCreateTransactionRequest <- req.as[CreateTransactionRequest]
 
         account    <- accountManagerClient.getAccountInfo(accountId)
         keychainId <- UuidUtils.stringToUuidIO(account.key)
 
-        response <- transactorClient
+        internalResponse <- transactorClient
           .createTransaction(
             accountId,
             keychainId,
             account.coin,
-            createTransactionRequest.coinSelection,
-            createTransactionRequest.outputs,
-            createTransactionRequest.feeLevel,
-            createTransactionRequest.customFeePerKb,
-            createTransactionRequest.maxUtxos
+            apiCreateTransactionRequest.coinSelection,
+            apiCreateTransactionRequest.outputs,
+            apiCreateTransactionRequest.feeLevel,
+            apiCreateTransactionRequest.customFeePerKb,
+            apiCreateTransactionRequest.maxUtxos
           )
-          .flatMap(Ok(_))
 
-      } yield response
+        apiUtxosDerivations = internalResponse.utxos.map(_.derivation.toList)
+        apiUtxosPublicKeys <- keychainClient.getAddressesPublicKeys(keychainId, apiUtxosDerivations)
+        apiUtxos = internalResponse.utxos
+          .zip(apiUtxosPublicKeys)
+          .map{case (commonUtxo, pubKey) => apiModels.SpendableTxo.fromCommon(commonUtxo, pubKey)}
+        response = CreateTransactionResponse.fromCommon(internalResponse, apiUtxos)
+      } yield response).flatMap(Ok(_))
 
     // Sign transaction (only for testing)
     case req @ POST -> Root / "_internal" / "sign" =>
@@ -73,7 +80,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
         response <- transactorClient
           .generateSignatures(
             request.rawTransaction,
-            request.utxos,
+            request.utxos.map(_.toCommon),
             request.privKey
           )
           .flatMap(Ok(_))
@@ -299,15 +306,20 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
           ) / "utxos" :? OptionalLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
-        log.info(s"Fetching UTXOs for account: $accountId") *>
-          interpreterClient
+        (for {
+          _          <- log.info(s"Fetching UTXOs for account: $accountId")
+          internalUtxos <- interpreterClient // List[common.Utxo]
             .getUtxos(
               accountId = accountId,
               limit = limit.getOrElse(0),
               offset = offset.getOrElse(0),
               sort = sort
             )
-            .flatMap(Ok(_))
+          apiUtxosTransactions = internalUtxos.utxos.map(_.transactionHash)
+          // FIXME: fetch the correct height and confirmations
+          apiUtxos = internalUtxos.utxos
+            .map(apiModels.PickableUtxo.fromCommon(_, 0, 0))
+        } yield apiUtxos).flatMap(Ok(_))
 
       // Get account balances
       case GET -> Root / UUIDVar(

@@ -12,6 +12,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient.{
   AddressValidation,
   Rejected
 }
+import co.ledger.lama.bitcoin.common.clients.grpc.mocks.KeychainClientMock
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.common.clients.grpc.AccountManagerClient
@@ -60,12 +61,13 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
 
     val transactor =
       transactorClient(broadcastResponse = raw => IO.delay(broadcastTransaction(raw)))
+    val keychainService = new KeychainClientMock
 
     assert(accountManager.resyncAccountCount == 0)
 
     val response =
       AccountController
-        .transactionsRoutes(accountManager, transactor)
+        .transactionsRoutes(keychainService, accountManager, transactor)
         .run(
           broadcastEndpoint.withEntity(broadcastBody)
         )
@@ -93,12 +95,13 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
       transactorClient(
         broadcastResponse = _ => IO.raiseError(new IllegalStateException("broadcast failed"))
       )
+    val keychainService = new KeychainClientMock
 
     assert(accountManager.resyncAccountCount == 0)
 
     val response =
       AccountController
-        .transactionsRoutes(accountManager, transactor)
+        .transactionsRoutes(keychainService, accountManager, transactor)
         .run(
           broadcastEndpoint.withEntity(broadcastBody)
         )
@@ -134,6 +137,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
         |""".stripMargin)
 
     val controller = AccountController.transactionsRoutes(
+      keychainClient = new KeychainClientMock,
       accountManagerClient = accountManagerClient(
         getAccountInfoResponse = validAccount,
         resyncAccountResponse = unusedStub
@@ -166,6 +170,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
   it should "refuse an empty list" in {
 
     val controller = AccountController.transactionsRoutes(
+      keychainClient = new KeychainClientMock,
       accountManagerClient = accountManagerClient(
         getAccountInfoResponse = validAccount,
         resyncAccountResponse = unusedStub
@@ -195,6 +200,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
          |""".stripMargin)
 
     val controller = AccountController.transactionsRoutes(
+      keychainClient = new KeychainClientMock,
       accountManagerClient = accountManagerClient(
         getAccountInfoResponse = validAccount,
         resyncAccountResponse = unusedStub
@@ -216,8 +222,8 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
           """
             | {
             |   "valid" : [ "address2", "address3" ],
-            |   "invalid" : 
-            |      {   
+            |   "invalid" :
+            |      {
             |         "address1" : "rejected"
             |      }
             | }
@@ -243,7 +249,16 @@ object AccountControllerSpec {
 
   def validAccount(id: UUID): IO[AccountInfo] =
     IO.delay(
-      new AccountInfo(id, UUID.randomUUID().toString, CoinFamily.Bitcoin, Coin.Btc, 1L, None, None, AccountGroup("TestGroup"))
+      new AccountInfo(
+        id,
+        UUID.randomUUID().toString,
+        CoinFamily.Bitcoin,
+        Coin.Btc,
+        1L,
+        None,
+        None,
+        AccountGroup("TestGroup")
+      )
     )
 
   def broadcastTransaction(rawTransaction: RawTransaction) = rawTransaction
@@ -319,7 +334,11 @@ object AccountControllerSpec {
         getAccountInfoResponse(accountId)
       }
 
-      override def getAccounts(group: Option[String], limit: Option[Int], offset: Option[Int]): IO[AccountsResult] = ???
+      override def getAccounts(
+          group: Option[String],
+          limit: Option[Int],
+          offset: Option[Int]
+      ): IO[AccountsResult] = ???
 
       override def getSyncEvents(
           accountId: UUID,
