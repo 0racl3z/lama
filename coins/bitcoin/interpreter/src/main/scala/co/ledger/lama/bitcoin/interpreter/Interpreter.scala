@@ -1,35 +1,36 @@
 package co.ledger.lama.bitcoin.interpreter
 
-import cats.effect.{ContextShift, IO}
+import cats.data.OptionT
+import cats.effect.{Clock, ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
+import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.services._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
 import io.circe.syntax._
-import fs2.Stream
+import fs2._
 import doobie.Transactor
+
 import java.time.Instant
 import java.util.UUID
-
-import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
+import java.util.concurrent.TimeUnit
+import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 
 class Interpreter(
     publish: Notification => IO[Unit],
     db: Transactor[IO],
-    maxConcurrent: Int
-)(implicit cs: ContextShift[IO])
-    extends IOLogging {
+    maxConcurrent: Int,
+    batchConcurrency: Db.BatchConcurrency
+)(implicit cs: ContextShift[IO], clock: Clock[IO])
+    extends DefaultContextLogging {
 
   val transactionService = new TransactionService(db, maxConcurrent)
-  val operationService   = new OperationService(db, maxConcurrent)
+  val operationService   = new OperationService(db, batchConcurrency)
   val flaggingService    = new FlaggingService(db)
-  val balanceService     = new BalanceService(db)
+  val balanceService     = new BalanceService(db, batchConcurrency)
 
-  def saveTransactions(
-      accountId: UUID,
-      transactions: List[TransactionView]
-  ): IO[Int] =
-    transactionService.saveTransactions(accountId, transactions)
+  def saveTransactions: Pipe[IO, AccountTxView, Int] =
+    transactionService.saveTransactions
 
   def getLastBlocks(
       accountId: UUID
@@ -96,16 +97,43 @@ class Interpreter(
     for {
       balanceHistoryCount <- balanceService.getBalanceHistoryCount(accountId)
 
-      nbSavedOps <- saveOperationsAndNotify(
-        accountId,
-        operationService.compute(accountId),
-        addresses,
-        coin,
-        balanceHistoryCount > 0
+      start <- clock.monotonic(TimeUnit.MILLISECONDS)
+
+      _ <- log.info(s"[$accountId] Flagging inputs and outputs belong")
+
+      _ <- flaggingService.flagInputsAndOutputs(accountId, addresses)
+
+      flaggingEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
+
+      _ <- operationService.deleteUnconfirmedOperations(accountId)
+
+      cleanUnconfirmedEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
+
+      _ <- log.info(s"[$accountId] Computing operations")
+      nbSavedOps <- operationService
+        .compute(accountId)
+        .through(
+          notify(
+            accountId,
+            coin,
+            balanceHistoryCount > 0
+          )
+        )
+        .compile
+        .foldMonoid
+
+      computeOperationEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
+
+      _ <- log.info(s"[$accountId] Computing balance history")
+      _ <- balanceService.computeNewBalanceHistory(accountId)
+
+      end <- clock.monotonic(TimeUnit.MILLISECONDS)
+
+      _ <- log.info(s"[$accountId] $nbSavedOps operations saved in ${end - start}ms ")
+      _ <- log.info(
+        s"[$accountId] flagging: ${flaggingEnd - start}ms, cleaning: ${cleanUnconfirmedEnd - flaggingEnd}ms, compute operations: ${computeOperationEnd - cleanUnconfirmedEnd}ms"
       )
 
-      _              <- log.info("Computing balance history")
-      _              <- balanceService.computeNewBalanceHistory(accountId)
       currentBalance <- balanceService.getCurrentBalance(accountId)
 
       _ <- publish(
@@ -119,47 +147,27 @@ class Interpreter(
 
     } yield nbSavedOps
 
-  def saveOperationsAndNotify(
+  def notify(
       accountId: UUID,
-      stream: Stream[IO, OperationToSave],
-      addresses: List[AccountAddress],
       coin: Coin,
       shouldNotify: Boolean
-  ): IO[Int] =
-    for {
-      _ <- log.info(s"Flagging inputs and outputs belong to account=$accountId")
-      _ <- flaggingService.flagInputsAndOutputs(accountId, addresses)
-
-      _ <- operationService.deleteUnconfirmedOperations(accountId)
-
-      _ <- log.info("Computing operations")
-      nbSavedOps <- stream
-        .through(operationService.saveOperationSink)
-        .parEvalMap(maxConcurrent) { op =>
-          if (shouldNotify)
-            for {
-              operationO <- operationService.getOperation(
-                Operation.AccountId(accountId),
-                op.uid
-              )
-            } yield operationO.map { operation =>
-              publish(
-                OperationNotification(
-                  accountId = accountId,
-                  coinFamily = CoinFamily.Bitcoin,
-                  coin = coin,
-                  operation = operation.asJson
-                )
-              )
-            }
-          else
-            IO.unit
-        }
-        .compile
-        .toList
-        .map(_.length)
-
-    } yield nbSavedOps
+  ): Pipe[IO, Operation.UID, Int] =
+    _.parEvalMap(maxConcurrent) { opId =>
+      OptionT
+        .whenF(shouldNotify)(
+          operationService.getOperation(Operation.AccountId(accountId), opId)
+        )
+        .foldF(IO.unit) { operation =>
+          publish(
+            OperationNotification(
+              accountId = accountId,
+              coinFamily = CoinFamily.Bitcoin,
+              coin = coin,
+              operation = operation.asJson
+            )
+          )
+        } *> IO.pure(1)
+    }
 
   def getBalance(
       accountId: UUID

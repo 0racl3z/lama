@@ -11,7 +11,7 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
 }
 import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
 import co.ledger.lama.bitcoin.worker.services._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.models.{AccountIdentifier, Coin, ReportError, ReportableEvent}
@@ -27,10 +27,8 @@ class Worker(
     keychainClient: KeychainClient,
     explorerClient: Coin => ExplorerClient,
     interpreterClient: InterpreterClient,
-    cursorService: Coin => CursorStateService[IO],
-    maxTxsToSavePerBatch: Int,
-    maxConcurrent: Int
-) extends IOLogging {
+    cursorService: Coin => CursorStateService[IO]
+) extends DefaultContextLogging {
 
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
     syncEventService.consumeWorkerMessages
@@ -70,9 +68,7 @@ class Worker(
     val bookkeeper = Bookkeeper(
       new Keychain(keychainClient),
       explorerClient,
-      interpreterClient,
-      maxTxsToSavePerBatch,
-      maxConcurrent
+      interpreterClient
     )
 
     val account       = workerMessage.account
@@ -92,11 +88,10 @@ class Worker(
           keychainId,
           None
         )
-        .map(_.addresses)
 
       lastMinedBlock <- lastMinedBlock(account.coin)
 
-      batchResult <- Stream
+      addresses <- Stream
         .emit(previousBlockState)
         .filter {
           case Some(previous) => previous < lastMinedBlock.block
@@ -115,16 +110,14 @@ class Worker(
         }
         .compile
         .toList
-
-      addresses = batchResult.flatMap(_.addresses)
+        .map(_.flatten)
 
       _ <- log.info(s"New cursor state: ${lastMinedBlock.block}")
 
       opsCount <- interpreterClient.compute(
         account.id,
         account.coin,
-        (addresses ++ addressesUsedByMempool).distinct,
-        Some((lastMinedBlock.block :: batchResult.flatMap(_.maxBlock)).max.height)
+        (addresses ++ addressesUsedByMempool).distinct
       )
 
       _ <- log.info(s"$opsCount operations computed")

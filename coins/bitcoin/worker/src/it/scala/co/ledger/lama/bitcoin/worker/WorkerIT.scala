@@ -60,9 +60,7 @@ class WorkerIT extends AnyFlatSpecLike with Matchers {
             keychainClient,
             explorerClient,
             interpreterClient,
-            cursorStateService,
-            conf.maxTxsToSavePerBatch,
-            conf.maxConcurrent
+            cursorStateService
           )
 
           val accountManager = new SimpleAccountManager(
@@ -74,7 +72,12 @@ class WorkerIT extends AnyFlatSpecLike with Matchers {
 
           val keychainId = UUID.randomUUID()
 
-          val account = AccountIdentifier(keychainId.toString, CoinFamily.Bitcoin, Coin.Btc)
+          val account = AccountIdentifier(
+            keychainId.toString,
+            CoinFamily.Bitcoin,
+            Coin.Btc,
+            AccountGroup("TestGroup")
+          )
 
           val syncId = UUID.randomUUID()
 

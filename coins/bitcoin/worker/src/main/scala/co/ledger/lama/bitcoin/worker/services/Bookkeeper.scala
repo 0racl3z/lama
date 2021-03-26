@@ -1,22 +1,19 @@
 package co.ledger.lama.bitcoin.worker.services
 
-import cats.Foldable
 import cats.effect.{ContextShift, IO, Timer}
-import cats.kernel.Monoid
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.models.explorer.{
-  Block,
   ConfirmedTransaction,
   DefaultInput,
   Transaction,
   UnconfirmedTransaction
 }
 import co.ledger.lama.bitcoin.common.models.interpreter.AccountAddress
-import co.ledger.lama.bitcoin.worker.services.Bookkeeper.BatchResult
 import co.ledger.lama.bitcoin.worker.services.Keychain.KeychainId
 import co.ledger.lama.common.models.Coin
 import fs2.{Pipe, Stream}
+
 import java.util.UUID
 
 trait Bookkeeper[F[_]] {
@@ -25,7 +22,7 @@ trait Bookkeeper[F[_]] {
       accountId: UUID,
       keychainId: UUID,
       blockHash: Option[Bookkeeper.BlockHash]
-  ): F[BatchResult]
+  ): F[List[AccountAddress]]
 }
 
 object Bookkeeper {
@@ -36,39 +33,29 @@ object Bookkeeper {
   def apply(
       keychain: Keychain,
       explorerClient: Coin => ExplorerClient,
-      interpreterClient: InterpreterClient,
-      maxTxsToSavePerBatch: Int,
-      maxConcurrent: Int
+      interpreterClient: InterpreterClient
   )(implicit cs: ContextShift[IO]): Bookkeeper[IO] = new Bookkeeper[IO] {
     override def record[Tx <: Transaction: Recordable](
         coin: Coin,
         accountId: AccountId,
         keychainId: AccountId,
         blockHash: Option[BlockHash]
-    ): IO[BatchResult] =
+    ): IO[List[AccountAddress]] =
       keychain
         .addresses(keychainId)
         .flatMap { addresses =>
           Stream
             .emit(addresses)
             .through(Bookkeeper.fetchTransactionRecords(explorerClient(coin), blockHash))
-            .through(
-              Bookkeeper
-                .saveTransactionRecords(
-                  interpreterClient,
-                  maxTxsToSavePerBatch,
-                  maxConcurrent,
-                  accountId
-                )
-            )
+            .through(Bookkeeper.saveTransactionRecords(interpreterClient, accountId))
             .foldMonoid
             .through(Bookkeeper.markAddresses(keychain, keychainId))
         }
-        .takeWhile(_.addresses.nonEmpty)
+        .takeWhile(_.nonEmpty)
         .foldMonoid
         .compile
         .toList
-        .map(Foldable[List].fold[BatchResult])
+        .map(_.flatten)
   }
 
   case class TransactionRecord[Tx <: Transaction: Recordable](
@@ -92,31 +79,14 @@ object Bookkeeper {
 
   def saveTransactionRecords[Tx <: Transaction: Recordable](
       interpreter: InterpreterClient,
-      maxSize: Int,
-      maxConcurrent: Int,
       accountId: AccountId
-  )(implicit
-      cs: ContextShift[IO],
-      recordable: Recordable[Tx]
-  ): Pipe[IO, TransactionRecord[Tx], BatchResult] =
-    _.chunkN(maxSize)
-      .parEvalMapUnordered(maxConcurrent) { trs =>
-        val txs           = trs.map(_.tx).toList
-        val usedAddresses = trs.map(_.usedAddresses).toList.flatten
-
-        val maxBlock = txs.collect { case ConfirmedTransaction(_, _, _, _, _, _, _, block, _) =>
-          block
-        }.maxOption
-
-        recordable
-          .save(interpreter)(accountId, txs)
-          .as(
-            BatchResult(
-              usedAddresses,
-              maxBlock
-            )
-          )
-      }
+  )(implicit recordable: Recordable[Tx]): Pipe[IO, TransactionRecord[Tx], List[AccountAddress]] =
+    _.chunks.flatMap { chunk =>
+      Stream
+        .chunk(chunk.map(_.tx))
+        .through(recordable.save(interpreter)(accountId))
+        .as(chunk.map(_.usedAddresses).toList.flatten)
+    }
 
   def addressUsedBy(tx: Transaction)(accountAddress: AccountAddress): Boolean = {
     tx.inputs
@@ -127,27 +97,24 @@ object Bookkeeper {
 
   def addressesUsed(
       accountAddresses: List[AccountAddress]
-  )(tx: Transaction): List[AccountAddress] = {
+  )(tx: Transaction): List[AccountAddress] =
     accountAddresses.filter(addressUsedBy(tx)).distinct
-  }
 
   def markAddresses[Tx <: Transaction](
       keychain: Keychain,
       keychainId: KeychainId
-  ): Pipe[IO, BatchResult, BatchResult] =
-    _.evalTap(batch =>
-      keychain.markAsUsed(keychainId, batch.addresses.distinct.map(_.accountAddress).toSet)
-    )
+  ): Pipe[IO, List[AccountAddress], List[AccountAddress]] =
+    _.evalTap { addresses =>
+      keychain.markAsUsed(keychainId, addresses.distinct.map(_.accountAddress).toSet)
+    }
 
   trait Recordable[Tx <: Transaction] {
     def fetch(
         explorer: ExplorerClient
     )(addresses: Set[Address], block: Option[BlockHash]): Stream[IO, Tx]
 
-    def save(interpreter: InterpreterClient)(accountId: AccountId, txs: List[Tx]): IO[String] =
-      for {
-        savedTxsCount <- interpreter.saveTransactions(accountId, txs.map(_.toTransactionView))
-      } yield s"$savedTxsCount new transactions saved"
+    def save(interpreter: InterpreterClient)(accountId: AccountId): Pipe[IO, Tx, Unit] =
+      _.map(_.toTransactionView).through(interpreter.saveTransactions(accountId))
   }
 
   implicit def confirmed(implicit
@@ -171,22 +138,4 @@ object Bookkeeper {
       )(addresses: Set[Address], block: Option[BlockHash]): Stream[IO, UnconfirmedTransaction] =
         explorer.getUnconfirmedTransactions(addresses)
     }
-
-  case class BatchResult(
-      addresses: List[AccountAddress],
-      maxBlock: Option[Block]
-  )
-
-  object BatchResult {
-
-    implicit def monoid[A <: Transaction]: Monoid[BatchResult] = new Monoid[BatchResult] {
-      override def empty: BatchResult = BatchResult(List.empty, None)
-
-      override def combine(x: BatchResult, y: BatchResult): BatchResult =
-        BatchResult(
-          addresses = (x.addresses ::: y.addresses).distinct,
-          maxBlock = List(x.maxBlock, y.maxBlock).flatten.maxOption
-        )
-    }
-  }
 }

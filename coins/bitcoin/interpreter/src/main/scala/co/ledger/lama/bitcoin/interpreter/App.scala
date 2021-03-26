@@ -26,12 +26,12 @@ object App extends IOApp {
       )
 
       // create the db transactor
-      db <- postgresTransactor(conf.postgres)
+      db <- postgresTransactor(conf.db.postgres)
 
       // define rpc service definitions
       serviceDefinitions = List(
         new InterpreterGrpcService(
-          new Interpreter(publisher, db, conf.maxConcurrent)
+          new Interpreter(publisher, db, conf.maxConcurrent, conf.db.batchConcurrency)
         ).definition,
         new HealthService().definition
       )
@@ -44,7 +44,7 @@ object App extends IOApp {
       .resource(resources)
       .evalMap { server =>
         // migrate db then start server
-        DbUtils.flywayMigrate(conf.postgres) *> IO(server.start())
+        DbUtils.flywayMigrate(conf.db.postgres) *> IO(server.start())
       }
       .evalMap(_ => IO.never)
       .compile

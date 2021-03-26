@@ -4,7 +4,7 @@ import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
 
 import scala.concurrent.duration.FiniteDuration
 
-trait DoobieLogHandler extends IOLogging {
+trait DoobieLogHandler extends DefaultContextLogging {
 
   implicit val logHandler: LogHandler = LogHandler {
     case Success(query, arguments, execTime, processTime) =>

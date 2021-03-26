@@ -2,41 +2,51 @@ package co.ledger.lama.bitcoin.interpreter.services
 
 import java.time.Instant
 import java.util.UUID
-
-import cats.effect.IO
+import cats.effect.{Concurrent, IO}
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.{BalanceHistory, CurrentBalance}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.bitcoin.interpreter.Config.Db
+import co.ledger.lama.common.logging.DefaultContextLogging
 import doobie.Transactor
 import doobie.implicits._
 
 import scala.annotation.tailrec
 
-class BalanceService(db: Transactor[IO]) extends IOLogging {
+class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency)
+    extends DefaultContextLogging {
 
-  def computeNewBalanceHistory(accountId: UUID): IO[Int] =
+  def computeNewBalanceHistory(accountId: UUID)(implicit concurrent: Concurrent[IO]): IO[Int] =
     for {
       lastBalance <- BalanceQueries
         .getLastBalance(accountId)
-        .transact(db)
         // If there is no history saved for this accountId yet, default to blockHeight = 0 and balance = 0
         .map(_.getOrElse(BalanceHistory(accountId, 0, Some(0), Instant.MIN)))
-
-      balances <- BalanceQueries
-        .getUncomputedBalanceHistories(accountId, lastBalance.blockHeight.getOrElse(0))
         .transact(db)
-        .map(balanceHistory =>
-          // We need to adjust each balance with the last known balance.
-          // This is necessary because we don't take into account the previous history
-          // by only computing from last block height.
-          balanceHistory.copy(balance = lastBalance.balance + balanceHistory.balance)
-        )
-        .compile
-        .toList
+
+      maxSavedBalanceHistoriesPerBatch = Math.max(1000 / batchConcurrency.value, 100)
+
+      _ <- log.info(
+        s"Saving balance histories of account $accountId (by $maxSavedBalanceHistoriesPerBatch-batch) from last height ${lastBalance.blockHeight} "
+      )
 
       nbSaved <- BalanceQueries
-        .saveBalanceHistory(balances)
+        .getUncomputedBalanceHistories(accountId, lastBalance.blockHeight.getOrElse(0))
+        .map(
+          balanceHistory =>
+            BalanceHistory(
+              accountId = balanceHistory.accountId,
+              balance = lastBalance.balance + balanceHistory.balance,
+              blockHeight = balanceHistory.blockHeight,
+              time = balanceHistory.time
+          ))
         .transact(db)
+        .chunkN(maxSavedBalanceHistoriesPerBatch)
+        .parEvalMapUnordered(batchConcurrency.value)(balances =>
+          BalanceQueries.saveBalanceHistory(balances.toList).transact(db))
+        .compile
+        .foldMonoid
+
+      _ <- log.info(s"All $nbSaved balance histories saved for account $accountId")
 
     } yield nbSaved
 
@@ -80,12 +90,12 @@ class BalanceService(db: Transactor[IO]) extends IOLogging {
       lastBalance = balances.lastOption.orElse(previousBalance).map(_.balance).getOrElse(BigInt(0))
 
       // Add mempool balance to the last balance
-      withMempoolBalance <-
-        if (mempoolIsInTimeRange) {
-          BalanceQueries
-            .getUnconfirmedBalance(accountId)
-            .transact(db)
-            .map(amount =>
+      withMempoolBalance <- if (mempoolIsInTimeRange) {
+        BalanceQueries
+          .getUnconfirmedBalance(accountId)
+          .transact(db)
+          .map(
+            amount =>
               balances.appended(
                 BalanceHistory(
                   accountId,
@@ -93,14 +103,14 @@ class BalanceService(db: Transactor[IO]) extends IOLogging {
                   None,
                   Instant.now()
                 )
-              )
-            )
-        } else
-          IO.pure(balances)
+            ))
+      } else
+        IO.pure(balances)
 
-    } yield intervalO
-      .map(getBalancesAtInterval(accountId, withMempoolBalance, previousBalance, _, startO, endO))
-      .getOrElse(withMempoolBalance)
+    } yield
+      intervalO
+        .map(getBalancesAtInterval(accountId, withMempoolBalance, previousBalance, _, startO, endO))
+        .getOrElse(withMempoolBalance)
 
   def getBalanceHistoryCount(accountId: UUID): IO[Int] =
     BalanceQueries.getBalanceHistoryCount(accountId).transact(db)

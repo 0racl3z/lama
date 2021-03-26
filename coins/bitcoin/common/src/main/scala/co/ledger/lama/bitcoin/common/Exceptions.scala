@@ -4,5 +4,5 @@ import org.http4s.Uri
 
 object Exceptions {
   case class ExplorerClientException(uri: Uri, t: Throwable)
-      extends Exception(s"Explorer client - ${uri.renderString} - ${t.getMessage}", t)
+      extends Exception(s"Error on explorer - ${uri.renderString}", t)
 }

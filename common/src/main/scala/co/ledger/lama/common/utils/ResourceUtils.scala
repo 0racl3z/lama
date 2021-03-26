@@ -1,14 +1,14 @@
 package co.ledger.lama.common.utils
 
 import cats.effect.{Async, Blocker, ContextShift, IO, Resource, Timer}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import fs2.Stream
 import io.grpc._
 import org.lyranthe.fs2_grpc.java_runtime.implicits._
 
-object ResourceUtils extends IOLogging {
+object ResourceUtils extends DefaultContextLogging {
 
   def retriableResource[F[_], O](
       label: String,

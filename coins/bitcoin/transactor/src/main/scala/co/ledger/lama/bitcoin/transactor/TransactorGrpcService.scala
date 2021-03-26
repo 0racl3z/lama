@@ -10,7 +10,7 @@ import co.ledger.lama.bitcoin.common.models.transactor.{
   PrepareTxOutput,
   RawTransaction
 }
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin}
 import co.ledger.lama.common.utils.UuidUtils
 import com.google.protobuf.ByteString
@@ -21,7 +21,9 @@ trait TransactorService extends protobuf.BitcoinTransactorServiceFs2Grpc[IO, Met
     protobuf.BitcoinTransactorServiceFs2Grpc.bindService(this)
 }
 
-class TransactorGrpcService(transactor: Transactor) extends TransactorService with IOLogging {
+class TransactorGrpcService(transactor: Transactor)
+    extends TransactorService
+    with DefaultContextLogging {
 
   def createTransaction(
       request: protobuf.CreateTransactionRequest,

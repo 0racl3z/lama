@@ -4,7 +4,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterGrpcClient, KeychainGrpcClient}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibGrpcClient
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.services.grpc.HealthService
 import co.ledger.lama.common.utils.ResourceUtils
@@ -12,7 +12,7 @@ import co.ledger.lama.common.utils.ResourceUtils.grpcManagedChannel
 import fs2._
 import pureconfig.ConfigSource
 
-object App extends IOApp with IOLogging {
+object App extends IOApp with DefaultContextLogging {
 
   def run(args: List[String]): IO[ExitCode] = {
     val conf = ConfigSource.default.loadOrThrow[Config]

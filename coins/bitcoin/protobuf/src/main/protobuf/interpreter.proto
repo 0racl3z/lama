@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 import "operation.proto";
 
@@ -9,7 +10,7 @@ package pb.v1;
 option java_package = "co.ledger.lama.bitcoin.interpreter.protobuf";
 
 service BitcoinInterpreterService {
-  rpc SaveTransactions(SaveTransactionsRequest) returns (ResultCount) {}
+  rpc SaveTransactions(stream SaveTransactionRequest) returns (stream google.protobuf.Empty) {}
   rpc GetLastBlocks(GetLastBlocksRequest) returns (GetLastBlocksResult) {}
   rpc RemoveDataFromCursor(DeleteTransactionsRequest) returns (ResultCount) {}
   rpc GetOperations(GetOperationsRequest) returns (GetOperationsResult) {}
@@ -27,9 +28,9 @@ enum SortingOrder {
   ASC = 1;
 }
 
-message SaveTransactionsRequest {
+message SaveTransactionRequest {
   bytes account_id = 1;
-  repeated TransactionView transactions = 2;
+  TransactionView transaction = 2;
 }
 
 message GetLastBlocksRequest {
@@ -44,7 +45,6 @@ message ComputeRequest {
   bytes account_id = 1;
   repeated AccountAddress addresses = 2;
   string coinId = 3;
-  int64 last_block_height = 4;
 }
 
 message DeleteTransactionsRequest {

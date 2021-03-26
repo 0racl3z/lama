@@ -13,7 +13,7 @@ import co.ledger.lama.common.logging.DoobieLogHandler
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
-import fs2.Stream
+import fs2._
 
 object TransactionQueries extends DoobieLogHandler {
 
@@ -26,9 +26,8 @@ object TransactionQueries extends DoobieLogHandler {
        """.query[BlockView].stream
   }
 
-  def saveTransaction(tx: TransactionView, accountId: UUID): ConnectionIO[Int] =
+  def saveTransaction(accountId: UUID, tx: TransactionView): ConnectionIO[Int] =
     for {
-
       txStatement <- insertTx(accountId, tx)
 
       _ <- insertInputs(
@@ -38,10 +37,7 @@ object TransactionQueries extends DoobieLogHandler {
       )
 
       _ <- insertOutputs(accountId, tx.hash, tx.outputs.toList)
-
-    } yield {
-      txStatement
-    }
+    } yield txStatement
 
   def deleteUnconfirmedTransactions(accountId: UUID): doobie.ConnectionIO[Int] = {
     sql"""DELETE FROM transaction

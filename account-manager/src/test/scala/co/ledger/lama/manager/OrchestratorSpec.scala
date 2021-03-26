@@ -46,7 +46,8 @@ class FakeOrchestrator(nbEvents: Int, override val awakeEvery: FiniteDuration)
     val now = Instant.now()
 
     (1 to nbEvents).map { i =>
-      val account = AccountIdentifier(s"xpub-$i", CoinFamily.Bitcoin, Coin.Btc)
+      val account =
+        AccountIdentifier(s"xpub-$i", CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup"))
       val event = WorkableEvent[JsonObject](
         accountId = account.id,
         syncId = UUID.randomUUID(),
@@ -78,7 +79,7 @@ class FakeSyncEventTask(workerMessages: Seq[WorkerMessage[JsonObject]]) extends 
 
   def publishWorkerMessagePipe: Pipe[IO, WorkerMessage[JsonObject], Unit] =
     _.evalMap { message =>
-      IO.pure(
+      IO(
         publishedWorkerMessages.update(
           message.account.id,
           publishedWorkerMessages.getOrElse(message.account.id, List.empty) :+ message
@@ -95,7 +96,7 @@ class FakeSyncEventTask(workerMessages: Seq[WorkerMessage[JsonObject]]) extends 
 
   def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit] =
     _.evalMap { e =>
-      IO.pure { reportedMessages = reportedMessages :+ e }
+      IO { reportedMessages = reportedMessages :+ e }
     }
 
   def triggerableEvents: Stream[IO, TriggerableEvent[JsonObject]] =
@@ -114,8 +115,6 @@ class FakeSyncEventTask(workerMessages: Seq[WorkerMessage[JsonObject]]) extends 
 
   def triggerEventsPipe: Pipe[IO, TriggerableEvent[JsonObject], Unit] =
     _.evalMap { e =>
-      IO.pure {
-        triggeredEvents = triggeredEvents :+ e.nextWorkable
-      }
+      IO { triggeredEvents = triggeredEvents :+ e.nextWorkable }
     }
 }

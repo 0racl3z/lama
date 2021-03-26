@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import cats.effect.{ContextShift, IO, Timer}
 import io.circe.syntax._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
@@ -77,7 +77,7 @@ class CoinSyncEventTask(
     redis: RedisClient
 )(implicit cs: ContextShift[IO])
     extends SyncEventTask
-    with IOLogging {
+    with DefaultContextLogging {
 
   // Fetch worker messages ready to publish from database.
   def publishableWorkerMessages: Stream[IO, WorkerMessage[JsonObject]] =

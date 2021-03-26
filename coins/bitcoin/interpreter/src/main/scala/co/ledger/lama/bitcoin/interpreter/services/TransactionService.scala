@@ -1,32 +1,31 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
-import java.util.UUID
-
 import cats.effect.{ContextShift, IO}
-import co.ledger.lama.bitcoin.common.models.interpreter.{BlockView, TransactionView}
+import co.ledger.lama.bitcoin.common.models.interpreter.BlockView
+import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
+import co.ledger.lama.common.logging.DefaultContextLogging
 import doobie.Transactor
 import doobie.implicits._
 import fs2._
 
-class TransactionService(
-    db: Transactor[IO],
-    maxConcurrent: Int
-) {
+import java.util.UUID
 
-  def saveTransactions(
-      accountId: UUID,
-      transactions: List[TransactionView]
-  )(implicit cs: ContextShift[IO]): IO[Int] = {
-    Stream
-      .emits[IO, TransactionView](transactions)
-      .parEvalMapUnordered(maxConcurrent) { tx =>
-        TransactionQueries
-          .saveTransaction(tx, accountId)
+class TransactionService(db: Transactor[IO], maxConcurrent: Int) extends DefaultContextLogging {
+
+  def saveTransactions(implicit cs: ContextShift[IO]): Pipe[IO, AccountTxView, Int] =
+    _.chunkN(100)
+      .parEvalMapUnordered(maxConcurrent) { chunk =>
+        Stream
+          .chunk(chunk)
+          .evalMap(a => TransactionQueries.saveTransaction(a.accountId, a.tx))
           .transact(db)
+          .compile
+          .foldMonoid
+          .flatMap { nbSaved =>
+            log.info(s"$nbSaved new transactions saved (from chunk size: ${chunk.size})") *>
+              IO.pure(nbSaved)
+          }
       }
-      .compile
-      .fold(0)(_ + _)
-  }
 
   def removeFromCursor(accountId: UUID, blockHeight: Long): IO[Int] =
     TransactionQueries

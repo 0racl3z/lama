@@ -10,7 +10,13 @@ import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{End, QueueInputOps
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, SyncEventService}
 import co.ledger.lama.common.models.Status.Registered
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
-import co.ledger.lama.common.models.{AccountIdentifier, Coin, CoinFamily, WorkableEvent}
+import co.ledger.lama.common.models.{
+  AccountGroup,
+  AccountIdentifier,
+  Coin,
+  CoinFamily,
+  WorkableEvent
+}
 import co.ledger.lama.common.utils.IOAssertion
 import fs2.concurrent.Queue
 import org.scalatest.flatspec.AnyFlatSpec
@@ -28,7 +34,12 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val accountIdentifier =
-    AccountIdentifier(UUID.randomUUID().toString, CoinFamily.Bitcoin, Coin.Btc)
+    AccountIdentifier(
+      UUID.randomUUID().toString,
+      CoinFamily.Bitcoin,
+      Coin.Btc,
+      AccountGroup("TestGroup")
+    )
   val accountAddresses = LazyList.from(1).map(_.toString)
   val blockchain = LazyList
     .from(0)
@@ -63,9 +74,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
     KeychainFixture.keychainClient(accountAddresses),
     _ => explorer,
     interpreter,
-    _ => alreadyValidBlockCursorService,
-    maxTxsToSavePerBatch = 1,
-    maxConcurrent = 1
+    _ => alreadyValidBlockCursorService
   )
 
   "Worker" should "run on each Registered event received" in IOAssertion {

@@ -11,6 +11,7 @@ case class CreateTransactionResponse(
     hash: String,
     witnessHash: String,
     utxos: List[Utxo],
+    outputs: List[PrepareTxOutput],
     fee: Long,
     feePerKb: Long
 ) {
@@ -20,6 +21,7 @@ case class CreateTransactionResponse(
       hash,
       witnessHash,
       utxos.map(_.toProto),
+      outputs.map(_.toProto),
       fee,
       feePerKb
     )
@@ -37,6 +39,7 @@ object CreateTransactionResponse {
       proto.hash,
       proto.witnessHash,
       proto.utxos.map(Utxo.fromProto).toList,
+      proto.outputs.map(PrepareTxOutput.fromProto).toList,
       proto.fee,
       proto.feePerKb
     )

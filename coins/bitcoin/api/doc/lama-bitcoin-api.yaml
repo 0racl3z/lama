@@ -439,6 +439,7 @@ components:
         - network
         - coin_family
         - coin
+        - group
       type: object
       properties:
         account_key:
@@ -457,6 +458,9 @@ components:
         label:
           type: string
           example: 'testnet account'
+        group:
+          type: string
+          example: 'Group 1'
     RegisterAccountResponse:
       type: object
       required:
@@ -539,11 +543,27 @@ components:
           type: string
           format: bigint
           example: '300000'
+    OutputResponse:
+      required:
+        - address
+        - value
+      type: object
+      properties:
+        address:
+          type: string
+          example: 'tb1qq93nw8lddl6d9trzcmunkw3kufzs0p4hgnu3hl'
+        value:
+          type: string
+          format: bigint
+          example: '300000'
+        derivation:
+          $ref: '#/components/schemas/Derivation'
     CreateTransactionResponse:
       required:
         - hex
         - hash
         - witness_hash
+        - outputs
         - utxos
         - fee
         - fee_per_kb
@@ -557,6 +577,10 @@ components:
         witness_hash:
           type: string
           example: 'c3781a66af971634002de4a4592ea5b62a7569a7d823998d1e27c1fad62837c6'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutputResponse'
         utxos:
           type: array
           items:

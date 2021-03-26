@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
-import co.ledger.lama.common.models.{AccountIdentifier, Coin, CoinFamily}
+import co.ledger.lama.common.models.{AccountGroup, AccountIdentifier, Coin, CoinFamily}
 import co.ledger.lama.common.utils.{DbUtils, RabbitUtils}
 import co.ledger.lama.manager.config.Config
 import co.ledger.lama.manager.utils.RedisUtils
@@ -24,7 +24,7 @@ trait TestResources {
 
   val conf: Config = ConfigSource.default.loadOrThrow[Config]
 
-  val accountTest: AccountIdentifier = AccountIdentifier("12345", CoinFamily.Bitcoin, Coin.Btc)
+  val accountTest: AccountIdentifier = AccountIdentifier("12345", CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup"))
 
   private val dbUrl      = conf.postgres.url
   private val dbUser     = conf.postgres.user

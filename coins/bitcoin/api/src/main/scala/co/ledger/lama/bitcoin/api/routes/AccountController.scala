@@ -17,7 +17,7 @@ import co.ledger.lama.common.models.implicits.defaultCirceConfig
 import co.ledger.lama.bitcoin.common.models.interpreter.ChangeType
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.common.clients.grpc.AccountManagerClient
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.UuidUtils
 import io.circe.Json
 import io.circe.generic.extras.auto._
@@ -29,7 +29,7 @@ import org.http4s.dsl.Http4sDsl
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-object AccountController extends Http4sDsl[IO] with IOLogging {
+object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(scala.concurrent.ExecutionContext.global)
 
@@ -153,7 +153,8 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             creationRequest.coin.coinFamily,
             creationRequest.coin,
             creationRequest.syncFrequency,
-            creationRequest.label
+            creationRequest.label,
+            creationRequest.group
           )
 
           _ <- log.info(
@@ -225,7 +226,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
         val t = for {
 
           // Get Account Info
-          accountsResult <- accountManagerClient.getAccounts(limit, offset)
+          accountsResult <- accountManagerClient.getAccounts(None, limit, offset)
           accountsWithIds = accountsResult.accounts.map(account => account.id -> account)
 
           // Get Balance

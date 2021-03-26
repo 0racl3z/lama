@@ -4,12 +4,12 @@ import cats.effect.IO
 import co.ledger.lama.bitcoin.common.clients.grpc.KeychainClient
 import co.ledger.lama.bitcoin.common.models.interpreter.AccountAddress
 import co.ledger.lama.bitcoin.worker.services.Keychain.{Address, KeychainId, addressesRanges}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import fs2.Stream
 
 import java.util.UUID
 
-class Keychain(client: KeychainClient) extends IOLogging {
+class Keychain(client: KeychainClient) extends DefaultContextLogging {
 
   def markAsUsed(id: KeychainId, addresses: Set[Address]): IO[Unit] =
     client

@@ -11,7 +11,7 @@ object ReportError {
   def fromThrowable(t: Throwable): ReportError =
     t match {
       case e: GrpcClientException => ReportError(e.clientName, Option(e.getMessage))
-      case unknown                => ReportError("unknown_error", Option(unknown.getMessage))
+      case unknown                => ReportError(unknown.getClass.getSimpleName, Option(unknown.getMessage))
     }
 
   implicit val encoder: Encoder[ReportError] = deriveConfiguredEncoder[ReportError]

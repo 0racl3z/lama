@@ -5,7 +5,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterGrpcClient, Keycha
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.services.grpc.HealthService
 import co.ledger.lama.common.models.Coin
@@ -17,7 +17,7 @@ import io.grpc.{ManagedChannel, Server}
 import org.http4s.client.Client
 import pureconfig.ConfigSource
 
-object App extends IOApp with IOLogging {
+object App extends IOApp with DefaultContextLogging {
 
   case class WorkerResources(
       rabbitClient: RabbitClient[IO],
@@ -68,9 +68,7 @@ object App extends IOApp with IOLogging {
         keychainClient,
         explorerClient,
         interpreterClient,
-        cursorStateService,
-        conf.maxTxsToSavePerBatch,
-        conf.maxConcurrent
+        cursorStateService
       )
 
       for {

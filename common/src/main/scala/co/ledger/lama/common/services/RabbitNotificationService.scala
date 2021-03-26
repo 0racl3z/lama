@@ -3,7 +3,7 @@ package co.ledger.lama.common.services
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.implicits.catsSyntaxApplicativeId
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Notification
 import dev.profunktor.fs2rabbit.effects.MessageEncoder
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -13,7 +13,7 @@ import io.circe.syntax._
 
 import java.nio.charset.StandardCharsets
 
-object RabbitNotificationService extends IOLogging {
+object RabbitNotificationService extends DefaultContextLogging {
 
   type NotificationPublisher = Notification => IO[Unit]
 

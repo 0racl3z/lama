@@ -1,7 +1,7 @@
 package co.ledger.lama.bitcoin.api.routes
 
 import cats.effect.{ContextShift, IO, Timer}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.protobuf.lama.common.HealthCheckResponse.ServingStatus
 import co.ledger.protobuf.lama.common.HealthFs2Grpc
 import co.ledger.protobuf.lama.common._
@@ -15,7 +15,7 @@ import cats.syntax.all._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
-object HealthController extends Http4sDsl[IO] with IOLogging {
+object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 

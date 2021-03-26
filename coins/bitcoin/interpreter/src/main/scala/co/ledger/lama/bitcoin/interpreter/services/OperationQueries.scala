@@ -91,7 +91,7 @@ object OperationQueries extends DoobieLogHandler {
             LEFT JOIN operation op
               ON op.hash = tx.hash
               AND op.account_id = tx.account_id
-          WHERE op.hash IS NULL
+          WHERE op.hash IS null
           AND tx.account_id = $accountId
        """
       .query[TransactionAmounts]

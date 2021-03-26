@@ -9,6 +9,8 @@ import java.util.UUID
 
 import scala.collection.mutable
 
+import fs2._
+
 class InterpreterClientMock extends InterpreterClient {
 
   var savedTransactions: mutable.Map[UUID, List[TransactionView]] = mutable.Map.empty
@@ -23,21 +25,21 @@ class InterpreterClientMock extends InterpreterClient {
       txs.size
     }
 
-  def saveTransactions(
-      accountId: UUID,
-      txs: List[TransactionView]
-  ): IO[Int] = {
-    savedTransactions.update(
-      accountId,
-      txs.filter(_.block.isDefined) ::: savedTransactions.getOrElse(accountId, Nil)
-    )
+  def saveTransactions(accountId: UUID): Pipe[IO, TransactionView, Unit] =
+    _.chunks.evalMap { chunk =>
+      val txs = chunk.toList
 
-    val unconfirmed = txs.filterNot(_.block.isDefined)
-    if (unconfirmed.nonEmpty)
-      saveUnconfirmedTransactions(accountId, unconfirmed)
+      savedTransactions.update(
+        accountId,
+        txs.filter(_.block.isDefined) ::: savedTransactions.getOrElse(accountId, Nil)
+      )
 
-    IO(txs.size)
-  }
+      val unconfirmed = txs.filterNot(_.block.isDefined)
+      if (unconfirmed.nonEmpty)
+        saveUnconfirmedTransactions(accountId, unconfirmed)
+
+      IO.unit
+    }
 
   def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int] = {
     savedTransactions.update(
@@ -79,8 +81,7 @@ class InterpreterClientMock extends InterpreterClient {
   def compute(
       accountId: UUID,
       coin: Coin,
-      addresses: List[AccountAddress],
-      lastblockHeight: Option[Long]
+      addresses: List[AccountAddress]
   ): IO[Int] = {
 
     val txViews = savedTransactions
@@ -248,5 +249,4 @@ class InterpreterClientMock extends InterpreterClient {
       interval: Option[Int] = None
   ): IO[GetBalanceHistoryResult] =
     IO.raiseError(new Exception("Not implements Yet"))
-
 }

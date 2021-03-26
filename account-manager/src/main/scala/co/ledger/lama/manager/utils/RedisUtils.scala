@@ -1,7 +1,7 @@
 package co.ledger.lama.manager.utils
 
 import cats.effect.{IO, Resource, Timer}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.ResourceUtils
 import co.ledger.lama.manager.config.RedisConfig
 import com.redis.RedisClient
@@ -9,7 +9,7 @@ import javax.net.ssl.SSLContext
 
 import scala.concurrent.duration._
 
-object RedisUtils extends IOLogging {
+object RedisUtils extends DefaultContextLogging {
 
   def createClient(conf: RedisConfig)(implicit t: Timer[IO]): Resource[IO, RedisClient] =
     ResourceUtils.retriableResource(

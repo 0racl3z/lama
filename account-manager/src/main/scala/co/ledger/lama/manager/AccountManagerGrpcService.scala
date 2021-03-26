@@ -1,12 +1,12 @@
 package co.ledger.lama.manager
 
 import cats.effect.{ConcurrentEffect, IO}
-import co.ledger.lama.common.logging.IOLogging
-import co.ledger.lama.common.models.{Coin, CoinFamily, Sort}
+import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.models.{AccountGroup, Coin, CoinFamily, Sort}
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.manager.protobuf.{ResyncAccountRequest, SyncEventResult}
 import com.google.protobuf.empty.Empty
-import io.grpc.{Metadata, ServerServiceDefinition}
+import io.grpc.{Metadata, ServerServiceDefinition, Status}
 
 trait AccountManagerService extends protobuf.AccountManagerServiceFs2Grpc[IO, Metadata] {
 
@@ -17,7 +17,7 @@ trait AccountManagerService extends protobuf.AccountManagerServiceFs2Grpc[IO, Me
 
 class AccountManagerGrpcService(accountManager: AccountManager)
     extends AccountManagerService
-    with IOLogging {
+    with DefaultContextLogging {
 
   def updateAccount(request: protobuf.UpdateAccountRequest, ctx: Metadata): IO[Empty] = {
     for {
@@ -36,15 +36,24 @@ class AccountManagerGrpcService(accountManager: AccountManager)
     // TODO: make Option in request
     val syncFrequencyO = if (request.syncFrequency == 0L) None else Some(request.syncFrequency)
 
-    accountManager
-      .registerAccount(
-        request.key,
-        CoinFamily.fromProto(request.coinFamily),
-        Coin.fromProto(request.coin),
-        syncFrequencyO,
-        request.label.map(_.value)
-      )
-      .map(_.toProto)
+    request.group.map(_.value) match {
+      case Some(group) =>
+        accountManager
+          .registerAccount(
+            request.key,
+            CoinFamily.fromProto(request.coinFamily),
+            Coin.fromProto(request.coin),
+            syncFrequencyO,
+            request.label.map(_.value),
+            AccountGroup(group)
+          )
+          .map(_.toProto)
+      // TODO: Add metadata about the actual INVALID_ARGUMENT in the IO
+      case None =>
+        log.error("received an account registration without group field.") *> IO.raiseError(
+          Status.INVALID_ARGUMENT.asException()
+        )
+    }
   }
 
   def resyncAccount(request: ResyncAccountRequest, ctx: Metadata): IO[SyncEventResult] =
@@ -76,7 +85,7 @@ class AccountManagerGrpcService(accountManager: AccountManager)
       ctx: Metadata
   ): IO[protobuf.AccountsResult] =
     accountManager
-      .getAccounts(request.limit, request.offset)
+      .getAccounts(request.group.map(AccountGroup.fromProto), request.limit, request.offset)
       .map(_.toProto)
 
   def getSyncEvents(

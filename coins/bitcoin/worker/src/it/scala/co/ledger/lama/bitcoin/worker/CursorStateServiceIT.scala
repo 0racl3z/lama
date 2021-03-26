@@ -11,7 +11,7 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{BlockView, TransactionV
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services.CursorStateService
 import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.models.Coin.Btc
 import co.ledger.lama.common.utils.IOAssertion
@@ -22,7 +22,9 @@ import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 
-class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging {
+import fs2._
+
+class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with DefaultContextLogging {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
@@ -45,9 +47,8 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging 
 
       for {
         // save transactions to create "blocks" in the interpreter
-        _ <- interpreterClient.saveTransactions(
-          accountId,
-          List(
+        _ <-
+          Stream(
             createTx(
               "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608371", //invalid
               559035L
@@ -68,8 +69,7 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging 
               "0000000000000000000bf68b57eacbff287ceafecb54a30dc3fd19630c9a3883", //valid but not last
               559031L
             )
-          )
-        )
+          ).through(interpreterClient.saveTransactions(accountId)).compile.drain
 
         block <- cursorStateService.getLastValidState(
           AccountId(accountId),

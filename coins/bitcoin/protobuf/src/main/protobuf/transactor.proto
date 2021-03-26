@@ -61,8 +61,9 @@ message CreateTransactionResponse {
   string hash = 2;
   string witness_hash = 3;
   repeated Utxo utxos = 4;
-  int64 fee = 5;
-  int64 fee_per_kb = 6;
+  repeated PrepareTxOutput outputs = 5;
+  int64 fee = 6;
+  int64 fee_per_kb = 7;
 }
 
 message RawTransaction {
@@ -96,6 +97,8 @@ message BroadcastTransactionRequest {
 message PrepareTxOutput {
   string address = 1;
   string value = 2;
+  // change is not null only if this output is for a change address
+  Derivation change = 3;
 }
 
 enum FeeLevel {

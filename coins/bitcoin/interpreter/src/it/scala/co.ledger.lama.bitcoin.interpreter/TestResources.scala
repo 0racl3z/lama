@@ -14,11 +14,11 @@ trait TestResources {
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val conf: Config   = ConfigSource.default.loadOrThrow[Config]
-  val flyway: Flyway = DbUtils.flyway(conf.postgres)
+  val flyway: Flyway = DbUtils.flyway(conf.db.postgres)
 
   def setup(): IO[Unit] = IO(flyway.clean()) *> IO(flyway.migrate())
 
   def appResources: Resource[IO, Transactor[IO]] =
-    ResourceUtils.postgresTransactor(conf.postgres)
+    ResourceUtils.postgresTransactor(conf.db.postgres)
 
 }

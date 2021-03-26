@@ -4,7 +4,7 @@ import java.time.Instant
 
 import cats.effect.IO
 import cats.implicits._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.manager.config.CoinConfig
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -14,7 +14,8 @@ import co.ledger.lama.common.models._
 import co.ledger.lama.manager.Exceptions._
 import io.circe.JsonObject
 
-class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) extends IOLogging {
+class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
+    extends DefaultContextLogging {
 
   def updateAccount(
       accountId: UUID,
@@ -31,13 +32,15 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
       coinFamily: CoinFamily,
       coin: Coin,
       syncFrequencyO: Option[Long],
-      label: Option[String]
+      label: Option[String],
+      group: AccountGroup
   ): IO[SyncEventResult] = {
 
     val account = AccountIdentifier(
       key,
       coinFamily,
-      coin
+      coin,
+      group
     )
 
     for {
@@ -163,7 +166,8 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
         accountInfo.coin,
         accountInfo.syncFrequency,
         lastSyncEvent,
-        accountInfo.label
+        accountInfo.label,
+        accountInfo.group
       )
     }
 
@@ -177,6 +181,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
   }
 
   def getAccounts(
+      group: Option[AccountGroup],
       requestLimit: Int,
       requestOffset: Int
   ): IO[AccountsResult] = {
@@ -186,6 +191,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
     for {
       accounts <- Queries
         .getAccounts(
+          group.map(_.name),
           offset = offset,
           limit = limit
         )
@@ -213,7 +219,8 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
                 account.updated
               )
             ),
-            account.label
+            account.label,
+            account.group
           )
         ),
         total

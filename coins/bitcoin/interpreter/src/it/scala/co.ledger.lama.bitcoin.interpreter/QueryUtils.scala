@@ -40,7 +40,7 @@ object QueryUtils {
 
   def saveTx(db: Transactor[IO], transaction: TransactionView, accountId: UUID): IO[Unit] = {
     TransactionQueries
-      .saveTransaction(transaction, accountId)
+      .saveTransaction(accountId, transaction)
       .transact(db)
       .void
   }

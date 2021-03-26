@@ -2,10 +2,13 @@ package co.ledger.lama.bitcoin.interpreter
 
 import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
+import co.ledger.lama.bitcoin.interpreter.protobuf.SaveTransactionRequest
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.grpc.{Metadata, ServerServiceDefinition}
+import fs2.Stream
 
 trait InterpreterService extends protobuf.BitcoinInterpreterServiceFs2Grpc[IO, Metadata] {
   def definition(implicit ce: ConcurrentEffect[IO]): ServerServiceDefinition =
@@ -15,19 +18,23 @@ trait InterpreterService extends protobuf.BitcoinInterpreterServiceFs2Grpc[IO, M
 class InterpreterGrpcService(
     interpreter: Interpreter
 ) extends InterpreterService
-    with IOLogging {
+    with DefaultContextLogging {
 
   def saveTransactions(
-      request: protobuf.SaveTransactionsRequest,
+      request: Stream[IO, SaveTransactionRequest],
       ctx: Metadata
-  ): IO[protobuf.ResultCount] = {
-    for {
-      accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
-      _          <- log.info(s"Saving ${request.transactions.size} transactions for $accountId")
-      txs        <- IO(request.transactions.map(TransactionView.fromProto).toList)
-      savedCount <- interpreter.saveTransactions(accountId, txs)
-    } yield protobuf.ResultCount(savedCount)
-  }
+  ): Stream[IO, com.google.protobuf.empty.Empty] =
+    request
+      .evalMap { r =>
+        for {
+          accountId <- UuidUtils.bytesToUuidIO(r.accountId)
+          tx <- IO
+            .fromOption(r.transaction)(new IllegalArgumentException("Missing transaction to save"))
+            .map(TransactionView.fromProto)
+        } yield AccountTxView(accountId, tx)
+      }
+      .through(interpreter.saveTransactions)
+      .as(com.google.protobuf.empty.Empty())
 
   def getLastBlocks(
       request: protobuf.GetLastBlocksRequest,
@@ -157,5 +164,4 @@ class InterpreterGrpcService(
 
       balances <- interpreter.getBalanceHistory(accountId, start, end, request.interval)
     } yield protobuf.GetBalanceHistoryResult(balances.map(_.toProto))
-
 }
