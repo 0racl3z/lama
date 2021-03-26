@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.mocks.InterpreterClientMock
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
 import co.ledger.lama.bitcoin.common.models.explorer.Block
-import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{End, QueueInputOps, registered}
+import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{registered, End, QueueInputOps}
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, SyncEventService}
 import co.ledger.lama.common.models.Status.Registered
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
@@ -21,9 +21,9 @@ import co.ledger.lama.common.utils.IOAssertion
 import fs2.concurrent.Queue
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
 import java.time.Instant
 import java.util.UUID
-
 import co.ledger.lama.bitcoin.common.models.interpreter.TransactionView
 
 import scala.concurrent.ExecutionContext

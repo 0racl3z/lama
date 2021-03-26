@@ -1,11 +1,11 @@
 package co.ledger.lama.manager
 
 import cats.effect.{ContextShift, IO, Timer}
-import io.circe.syntax._
+import cats.implicits.showInterpolator
 import co.ledger.lama.common.logging.DefaultContextLogging
-import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
+import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.config.CoinConfig
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -14,6 +14,7 @@ import doobie.implicits._
 import doobie.util.transactor.Transactor
 import fs2.{Pipe, Stream}
 import io.circe.JsonObject
+import io.circe.syntax._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -115,9 +116,9 @@ class CoinSyncEventTask(
   // Insert reportable events in database and publish next pending event.
   def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit] =
     _.evalMap { message =>
-      Queries.insertSyncEvent(message.event).transact(db).void *>
-        publisher.dequeue(message.account.id) *>
-        log.info(s"Reported message: ${message.asJson.toString}")
+          Queries.insertSyncEvent(message.event).transact(db).void *>
+            publisher.dequeue(message.account.id) *>
+            log.info(show"Reported message: $message")
     }
 
   // Fetch triggerable events from database.
