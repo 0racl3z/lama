@@ -46,6 +46,8 @@ object bitcoinLib {
       hex: String,
       hash: String,
       witnessHash: String,
+      changeAmount: Long,
+      totalFees: Long,
       notEnoughUtxo: Option[NotEnoughUtxo]
   ) {
     def toProto: libgrpc.RawTransactionResponse =
@@ -53,6 +55,8 @@ object bitcoinLib {
         hex,
         hash,
         witnessHash,
+        changeAmount,
+        totalFees,
         notEnoughUtxo.map(_.toProto)
       )
   }
@@ -63,6 +67,8 @@ object bitcoinLib {
         proto.hex,
         proto.hash,
         proto.witnessHash,
+        proto.changeAmount,
+        proto.totalFees,
         proto.notEnoughUtxo.map(NotEnoughUtxo.fromProto)
       )
   }

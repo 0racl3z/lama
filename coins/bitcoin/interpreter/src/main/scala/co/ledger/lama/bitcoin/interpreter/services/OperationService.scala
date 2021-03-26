@@ -1,25 +1,27 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
 import cats.data.{NonEmptyList, OptionT}
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Clock, ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
-import co.ledger.lama.bitcoin.interpreter.models.{OperationToSave, TransactionAmounts}
+import co.ledger.lama.bitcoin.interpreter.Config.Db
+import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
 import co.ledger.lama.bitcoin.interpreter.services.OperationQueries.{
   OpWithoutDetails,
   TransactionDetails
 }
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import fs2._
 
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class OperationService(
     db: Transactor[IO],
-    maxConcurrent: Int
-) extends IOLogging {
+    batchConcurrency: Db.BatchConcurrency
+) extends DefaultContextLogging {
 
   def getOperations(
       accountId: UUID,
@@ -171,24 +173,42 @@ class OperationService(
   def removeFromCursor(accountId: UUID, blockHeight: Long): IO[Int] =
     OperationQueries.removeFromCursor(accountId, blockHeight).transact(db)
 
-  def compute(accountId: UUID): Stream[IO, OperationToSave] =
+  def compute(
+      accountId: UUID
+  )(implicit cs: ContextShift[IO], clock: Clock[IO]): Stream[IO, Operation.UID] =
     operationSource(accountId)
-      .flatMap(op => Stream.chunk(op.computeOperations))
+      .flatMap { op =>
+        op.computeOperations
+      }
+      .through(saveOperationSink)
 
-  private def operationSource(accountId: UUID): Stream[IO, TransactionAmounts] =
+  private def operationSource(accountId: UUID) =
     OperationQueries
       .fetchTransactionAmounts(accountId)
       .transact(db)
 
-  def saveOperationSink(implicit cs: ContextShift[IO]): Pipe[IO, OperationToSave, OperationToSave] =
+  private def saveOperationSink(implicit
+      cs: ContextShift[IO],
+      clock: Clock[IO]
+  ): Pipe[IO, OperationToSave, Operation.UID] = {
+
+    val batchSize = Math.max(1000 / batchConcurrency.value, 100)
+
     in =>
-      in.chunkN(1000) // TODO : in conf
-        .prefetch
-        .parEvalMapUnordered(maxConcurrent) { batch =>
-          OperationQueries.saveOperations(batch).transact(db).map(_ => batch)
+      in.chunkN(batchSize)
+        .parEvalMap(batchConcurrency.value) { operations =>
+          for {
+            start    <- clock.monotonic(TimeUnit.MILLISECONDS)
+            savedOps <- OperationQueries.saveOperations(operations).transact(db)
+            end      <- clock.monotonic(TimeUnit.MILLISECONDS)
+            _ <- log.debug(
+              s"${operations.head.map(_.uid)}: $savedOps operations saved in ${end - start} ms"
+            )
+          } yield operations.map(_.uid)
+
         }
         .flatMap(Stream.chunk)
-
+  }
 }
 
 object OperationService {

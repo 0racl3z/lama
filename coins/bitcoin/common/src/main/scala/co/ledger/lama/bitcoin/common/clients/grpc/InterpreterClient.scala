@@ -10,9 +10,10 @@ import co.ledger.lama.common.clients.grpc.GrpcClient
 import co.ledger.lama.common.models.{Coin, Sort}
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.grpc.{ManagedChannel, Metadata}
+import fs2._
 
 trait InterpreterClient {
-  def saveTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int]
+  def saveTransactions(accountId: UUID): Pipe[IO, TransactionView, Unit]
 
   def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int]
 
@@ -21,8 +22,7 @@ trait InterpreterClient {
   def compute(
       accountId: UUID,
       coin: Coin,
-      addresses: List[AccountAddress],
-      lastBlockHeight: Option[Long]
+      addresses: List[AccountAddress]
   ): IO[Int]
 
   def getOperations(
@@ -72,16 +72,13 @@ class InterpreterGrpcClient(
       "InterpreterClient"
     )
 
-  def saveTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int] =
-    client
-      .saveTransactions(
-        protobuf.SaveTransactionsRequest(
-          accountId = UuidUtils uuidToBytes accountId,
-          transactions = txs.map(_.toProto)
-        ),
-        new Metadata()
+  def saveTransactions(accountId: UUID): Pipe[IO, TransactionView, Unit] =
+    _.map { tx =>
+      protobuf.SaveTransactionRequest(
+        accountId = UuidUtils.uuidToBytes(accountId),
+        transaction = Some(tx.toProto)
       )
-      .map(_.count)
+    }.through(client.saveTransactions(_, new Metadata()).as(()))
 
   def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int] =
     client
@@ -107,16 +104,14 @@ class InterpreterGrpcClient(
   def compute(
       accountId: UUID,
       coin: Coin,
-      addresses: List[AccountAddress],
-      lastBlockHeight: Option[Long]
+      addresses: List[AccountAddress]
   ): IO[Int] =
     client
       .compute(
         protobuf.ComputeRequest(
           UuidUtils.uuidToBytes(accountId),
           addresses.map(_.toProto),
-          coin.name,
-          lastBlockHeight.getOrElse(0L)
+          coin.name
         ),
         new Metadata()
       )
@@ -214,5 +209,4 @@ class InterpreterGrpcClient(
       )
       .map(GetBalanceHistoryResult.fromProto)
   }
-
 }

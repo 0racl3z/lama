@@ -3,15 +3,15 @@ package co.ledger.lama.bitcoin.interpreter
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
-
 import co.ledger.lama.bitcoin.common.models.interpreter.BalanceHistory
+import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.services.BalanceService
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 class BalanceServiceSpec extends AnyFlatSpecLike with Matchers {
 
-  private val service = new BalanceService(null)
+  private val service = new BalanceService(null, Db.BatchConcurrency(5))
 
   "getBalancesAtInterval" should "get balances at time interval" in {
 

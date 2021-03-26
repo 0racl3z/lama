@@ -39,3 +39,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Create docker image
         run: sbt "${{ matrix.component }}/docker:publish"
+    env:
+      LOG_APPENDER: STDOUT
+

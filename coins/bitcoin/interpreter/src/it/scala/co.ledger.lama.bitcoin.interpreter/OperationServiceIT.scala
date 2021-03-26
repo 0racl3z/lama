@@ -82,7 +82,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   "operation saved in db" should "be fetched" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         for {
@@ -90,7 +90,6 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress2))
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
 
@@ -127,7 +126,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         for {
@@ -135,7 +134,6 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress2))
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
 
@@ -174,7 +172,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   it should "fetched only ops from a blockHeight cursor" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         for {
@@ -183,7 +181,6 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress2))
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           res <- operationService.getOperations(
@@ -218,7 +215,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   it should "have made utxos" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         for {
@@ -226,7 +223,6 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress1))
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           res <- operationService.getUtxos(accountId, Sort.Ascending, 20, 0)
@@ -247,7 +243,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   "unconfirmed Transactions" should "have made utxos" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
 
         val unconfirmedTransaction1 = TransactionView(
           "txId1",

@@ -1,18 +1,15 @@
 package co.ledger.lama.bitcoin.interpreter.models
 
+import cats.effect.IO
+import co.ledger.lama.common.models.implicits._
+import co.ledger.lama.bitcoin.common.models.interpreter.{Operation, OperationType}
+import co.ledger.lama.common.logging.DefaultContextLogging
+import io.circe.generic.extras.semiauto._
+import io.circe.{Decoder, Encoder}
+import fs2.Stream
+
 import java.time.Instant
 import java.util.UUID
-import co.ledger.lama.common.models.implicits._
-import co.ledger.lama.bitcoin.common.models.interpreter.{
-  ChangeType,
-  Operation,
-  OperationType,
-  TransactionView
-}
-import co.ledger.lama.common.logging.IOLogging
-import fs2.Chunk
-import io.circe.{Decoder, Encoder}
-import io.circe.generic.extras.semiauto._
 
 case class OperationToSave(
     uid: Operation.UID,
@@ -31,25 +28,6 @@ object OperationToSave {
     deriveConfiguredEncoder[OperationToSave]
   implicit val decoder: Decoder[OperationToSave] =
     deriveConfiguredDecoder[OperationToSave]
-
-  def fromTransactionView(accountId: UUID, tx: TransactionView): List[OperationToSave] =
-    TransactionAmounts(
-      accountId,
-      tx.hash,
-      None,
-      None,
-      None,
-      tx.fees,
-      tx.inputs.filter(_.belongs).map(_.value).sum,
-      tx.outputs
-        .filter(o => o.belongs && o.changeType.contains(ChangeType.Internal))
-        .map(_.value)
-        .sum,
-      tx.outputs
-        .filter(o => o.belongs && o.changeType.contains(ChangeType.External))
-        .map(_.value)
-        .sum
-    ).computeOperations.toList
 }
 
 case class TransactionAmounts(
@@ -62,26 +40,29 @@ case class TransactionAmounts(
     inputAmount: BigInt,
     outputAmount: BigInt,
     changeAmount: BigInt
-) extends IOLogging {
+) extends DefaultContextLogging {
 
-  def computeOperations: Chunk[OperationToSave] = {
+  def computeOperations: fs2.Stream[IO, OperationToSave] = {
     TransactionType.fromAmounts(inputAmount, outputAmount, changeAmount) match {
       case SendType =>
-        Chunk(makeOperationToSave(inputAmount - changeAmount, OperationType.Send))
+        Stream.emit(makeOperationToSave(inputAmount - changeAmount, OperationType.Send))
       case ReceiveType =>
-        Chunk(makeOperationToSave(outputAmount + changeAmount, OperationType.Receive))
+        Stream.emit(makeOperationToSave(outputAmount + changeAmount, OperationType.Receive))
       case ChangeOnlyType =>
-        Chunk(makeOperationToSave(changeAmount, OperationType.Receive))
+        Stream.emit(makeOperationToSave(changeAmount, OperationType.Receive))
       case BothType =>
-        Chunk(
+        Stream(
           makeOperationToSave(inputAmount - changeAmount, OperationType.Send),
           makeOperationToSave(outputAmount, OperationType.Receive)
         )
       case NoneType =>
-        log.error(
-          s"Error on tx : $hash, no transaction type found for amounts : input: $inputAmount, output: $outputAmount, change: $changeAmount"
-        )
-        Chunk.empty
+        Stream
+          .eval(
+            log.error(
+              s"Error on tx : $hash, no transaction type found for amounts : input: $inputAmount, output: $outputAmount, change: $changeAmount"
+            )
+          )
+          .flatMap(_ => Stream.empty)
     }
   }
 

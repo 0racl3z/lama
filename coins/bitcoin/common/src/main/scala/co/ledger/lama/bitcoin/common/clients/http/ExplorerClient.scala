@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
 import co.ledger.lama.bitcoin.common.config.ExplorerConfig
 import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.transactor.FeeInfo
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.{Btc, BtcRegtest, BtcTestnet, Ltc}
 import co.ledger.lama.common.utils
@@ -18,7 +18,7 @@ import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.client.Client
 import org.http4s.{EntityDecoder, Method, Request, Uri}
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration._
 
 trait ExplorerClient {
 
@@ -48,7 +48,7 @@ object ExplorerClient {
 
 class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coin)
     extends ExplorerClient
-    with IOLogging {
+    with DefaultContextLogging {
 
   private val coinBasePath = coin match {
     case Btc        => "/blockchain/v3/btc"
@@ -69,15 +69,19 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
         .expect[A](req)
         .handleErrorWith(e => IO.raiseError(ExplorerClientException(req.uri, e)))
 
-  private def callWithRetry[A](
-      req: Request[IO],
-      timeout: FiniteDuration
+  private def callExpectWithRetry[A](
+      req: Request[IO]
   )(implicit cs: ContextShift[IO], c: EntityDecoder[IO, A], t: Timer[IO]): IO[A] =
-    IOUtils.retry(
-      callExpect(req)
-        .timeout(timeout),
-      policy = utils.RetryPolicy.exponential(initial = 500.millis, maxElapsedTime = 1.minute)
-    )
+    IOUtils
+      .retry(
+        callExpect(req).timeout(conf.timeout),
+        policy = utils.RetryPolicy.exponential(initial = 500.millis, maxElapsedTime = 30.seconds)
+      )
+      .handleErrorWith { e =>
+        val explorerException = ExplorerClientException(req.uri, e)
+        log.error("Explorer error", explorerException) *>
+          IO.raiseError(explorerException)
+      }
 
   def getCurrentBlock: IO[Block] =
     callExpect[Block](conf.uri.withPath(s"$coinBasePath/blocks/current"))
@@ -105,7 +109,6 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
             }
             Stream.emits(confirmedTxs)
           }
-
       }
       .parJoinUnbounded
 
@@ -116,6 +119,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
     val getPendingTransactionRequest = (as: Chunk[Address]) => {
       val baseUri = conf.uri
         .withPath(s"$coinBasePath/addresses/${as.toList.mkString(",")}/transactions/pending")
+        .withQueryParam("no_token", true)
       Request[IO](Method.GET, baseUri)
     }
 
@@ -131,7 +135,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
       .evalTap(logInfo)
       .map(getPendingTransactionRequest)
       .evalTap(r => log.debug(s"$r"))
-      .evalMap(request => callWithRetry[List[UnconfirmedTransaction]](request, conf.timeout))
+      .evalMap(request => callExpectWithRetry[List[UnconfirmedTransaction]](request))
       .flatMap(Stream.emits(_))
   }
 
@@ -209,10 +213,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
         log.info(
           s"Getting txs with block_hash=$blockHash for addresses: ${addresses.mkString(",")}"
         ) *>
-          IOUtils.retry(
-            callExpect[GetTransactionsResponse](GetOperationsRequest(addresses, blockHash))
-              .timeout(conf.timeout)
-          )
+          callExpectWithRetry[GetTransactionsResponse](GetOperationsRequest(addresses, blockHash))
       )
       .flatMap { res =>
         if (res.truncated) {

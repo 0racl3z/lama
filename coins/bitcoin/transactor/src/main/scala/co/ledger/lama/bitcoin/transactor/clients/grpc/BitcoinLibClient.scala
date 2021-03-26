@@ -9,7 +9,7 @@ import co.ledger.lama.bitcoin.common.models.transactor.{PrepareTxOutput, RawTran
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib._
 import co.ledger.lama.bitcoin.transactor.models.implicits._
 import co.ledger.lama.common.clients.grpc.GrpcClient
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.protobuf.bitcoin.libgrpc
 import io.grpc.{ManagedChannel, Metadata}
 
@@ -44,7 +44,7 @@ trait BitcoinLibClient {
 
 class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: ContextShift[IO])
     extends BitcoinLibClient
-    with IOLogging {
+    with DefaultContextLogging {
 
   val client: libgrpc.CoinServiceFs2Grpc[IO, Metadata] =
     GrpcClient.resolveClient(
@@ -112,6 +112,8 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
               rawTransaction.hex,
               rawTransaction.hash,
               rawTransaction.witnessHash,
+              0L,
+              0L,
               None
             )
           ),
@@ -142,6 +144,8 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
               rawTransaction.hex,
               rawTransaction.hash,
               rawTransaction.witnessHash,
+              0L,
+              0L,
               None
             )
           ),

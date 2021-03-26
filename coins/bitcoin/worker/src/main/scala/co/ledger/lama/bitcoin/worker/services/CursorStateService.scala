@@ -7,7 +7,7 @@ import co.ledger.lama.bitcoin.common.models.explorer.Block
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import org.http4s.client.UnexpectedStatus
 
 trait CursorStateService[F[_]] {
@@ -18,7 +18,7 @@ object CursorStateService {
   def apply(
       explorerClient: ExplorerClient,
       interpreterClient: InterpreterClient
-  ): CursorStateService[IO] = new CursorStateService[IO] with IOLogging {
+  ): CursorStateService[IO] = new CursorStateService[IO] with DefaultContextLogging {
 
     /* This method checks if the provided block is valid by calling "explorerClient.getBlock()"
      * If it is, the block is returned and used for the next sync

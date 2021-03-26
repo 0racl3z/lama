@@ -7,12 +7,14 @@ import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfigur
 
 case class PrepareTxOutput(
     address: String,
-    value: BigInt
+    value: BigInt,
+    change: Option[List[Int]] = None
 ) {
   def toProto: protobuf.PrepareTxOutput =
     protobuf.PrepareTxOutput(
       address,
-      value.toString
+      value.toString,
+      change.map(protobuf.Derivation(_))
     )
 }
 
@@ -23,6 +25,7 @@ object PrepareTxOutput {
   def fromProto(proto: protobuf.PrepareTxOutput): PrepareTxOutput =
     PrepareTxOutput(
       proto.address,
-      BigInt(proto.value)
+      BigInt(proto.value),
+      proto.change.map(_.path.toList)
     )
 }

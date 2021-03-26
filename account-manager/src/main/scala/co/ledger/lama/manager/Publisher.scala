@@ -3,7 +3,7 @@ package co.ledger.lama.manager
 import java.util.UUID
 
 import cats.effect.IO
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.messages.{WithBusinessId, WorkerMessage}
 import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.Exceptions.RedisUnexpectedException
@@ -127,7 +127,7 @@ class WorkerMessagePublisher(
     routingKey: RoutingKey
 )(implicit val enc: Encoder[WorkerMessage[JsonObject]], val dec: Decoder[WorkerMessage[JsonObject]])
     extends Publisher[UUID, WorkerMessage[JsonObject]]
-    with IOLogging {
+    with DefaultContextLogging {
 
   def publish(message: WorkerMessage[JsonObject]): IO[Unit] =
     publisher

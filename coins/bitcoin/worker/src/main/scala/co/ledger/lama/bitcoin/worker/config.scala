@@ -24,10 +24,6 @@ object config {
 
     def queueName(exchangeName: ExchangeName): QueueName =
       QueueName(s"${exchangeName.value}.bitcoin")
-
-    val maxConcurrent: Int = 50 // TODO : bench [Runtime.getRuntime.availableProcessors() * x]
-
-    val maxTxsToSavePerBatch: Int = 100 // to avoid gRPC message exceeds maximum size
   }
 
   object Config {

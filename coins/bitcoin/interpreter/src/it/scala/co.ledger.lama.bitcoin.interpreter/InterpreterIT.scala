@@ -3,15 +3,17 @@ package co.ledger.lama.bitcoin.interpreter
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
-
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter._
+import co.ledger.lama.bitcoin.interpreter.Config.Db
+import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 import co.ledger.lama.common.models.{Coin, Sort}
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import fs2.Stream
 
 class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
@@ -62,10 +64,18 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
       1
     )
 
+  def saveTxs(interpreter: Interpreter, txs: List[TransactionView]): IO[Unit] =
+    Stream
+      .emits(txs)
+      .map { tx => AccountTxView(accountId, tx) }
+      .through(interpreter.saveTransactions)
+      .compile
+      .drain
+
   "a transaction" should "have a full lifecycle" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val block2 = BlockView(
           "0000000000000000000cc9cc204cf3b314d106e69afbea68f2ae7f9e5047ba74",
@@ -82,10 +92,10 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         val blocksToSave = List(block2, block, block3)
 
         for {
-          _ <- interpreter.saveTransactions(accountId, List(insertTx))
-          _ <- interpreter.saveTransactions(
-            accountId,
+          _ <- saveTxs(
+            interpreter,
             List(
+              insertTx,
               insertTx.copy(hash = "toto", block = Some(block2)),
               insertTx.copy(hash = "tata", block = Some(block3))
             )
@@ -177,7 +187,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an unconfirmed transaction" should "have a full lifecycle" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx = TransactionView(
           "txId",
@@ -196,8 +206,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         )
 
         for {
-          _ <- interpreter.saveTransactions(accountId, List(uTx))
-          _ <- interpreter.saveTransactions(accountId, List(uTx2))
+          _ <- saveTxs(interpreter, List(uTx, uTx2))
+
           _ <- interpreter.compute(
             accountId,
             List(outputAddress1),
@@ -223,7 +233,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an unconfirmed transaction" should "be updated if it's been mined" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx = TransactionView(
           "txId",
@@ -250,8 +260,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         )
 
         for {
-          _ <- interpreter.saveTransactions(accountId, List(uTx))
-          _ <- interpreter.saveTransactions(accountId, List(tx))
+          _ <- saveTxs(interpreter, List(uTx, tx))
+
           _ <- interpreter.compute(
             accountId,
             List(outputAddress1),
@@ -269,7 +279,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an account" should "go through multiple cycles" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx1 = TransactionView(
           "tx1",
@@ -315,15 +325,15 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         )
 
         for {
-          _             <- interpreter.saveTransactions(accountId, List(uTx1))
+          _             <- saveTxs(interpreter, List(uTx1))
           _             <- interpreter.compute(accountId, List(outputAddress1), Coin.Btc)
           firstBalance  <- interpreter.getBalance(accountId)
           firstBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r1            <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
           GetOperationsResult(firstOperations, _, _) = r1
 
-          _ <- interpreter.saveTransactions(
-            accountId,
+          _ <- saveTxs(
+            interpreter,
             List(
               uTx1.copy(block = Some(BlockView("block1", 1L, time))), // mine first transaction
               uTx2
@@ -335,8 +345,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           r2             <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
           GetOperationsResult(secondOperations, _, _) = r2
 
-          _ <- interpreter.saveTransactions(
-            accountId,
+          _ <- saveTxs(
+            interpreter,
             List(
               uTx2.copy(block =
                 Some(BlockView("block2", 2L, time.plus(10, ChronoUnit.MINUTES)))

@@ -2,7 +2,7 @@ package co.ledger.lama.bitcoin.worker.services
 
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.explorer.Block
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.common.utils.RabbitUtils.AutoAckMessage
@@ -22,7 +22,7 @@ class RabbitSyncEventService(
     lamaExchangeName: ExchangeName,
     lamaRoutingKey: RoutingKey
 ) extends SyncEventService
-    with IOLogging {
+    with DefaultContextLogging {
 
   def consumeWorkerMessages: Stream[IO, AutoAckMessage[WorkerMessage[Block]]] =
     RabbitUtils.createConsumer[WorkerMessage[Block]](rabbitClient, workerQueueName)

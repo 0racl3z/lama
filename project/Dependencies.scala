@@ -20,7 +20,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   )
 
   val H2Version     = "1.4.200"
-  val flywayVersion = "7.7.0"
+  val flywayVersion = "7.7.1"
   val doobieVersion = "0.10.0"
   val postgres: Seq[ModuleID] = Seq(
     "com.h2database" % "h2"              % H2Version,
@@ -33,18 +33,20 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
 
   val pureconfigVersion   = "0.14.1"
   val logbackVersion      = "1.2.3"
+  val logbackJsonVersion  = "6.6"
   val fs2Version          = "2.5.3"
   val fs2GrpcVersion      = "0.9.0"
   val protobufJava        = "3.15.6"
-  val scalaLoggingVersion = "3.9.2"
+  val scalaLoggingVersion = "3.9.3"
 
   val utilities: Seq[ModuleID] = Seq(
-    "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
-    "co.fs2"                     %% "fs2-core"        % fs2Version,
-    "org.lyranthe.fs2-grpc"      %% "java-runtime"    % fs2GrpcVersion,
-    "ch.qos.logback"              % "logback-classic" % logbackVersion,
-    "com.github.pureconfig"      %% "pureconfig"      % pureconfigVersion,
-    "com.github.pureconfig"      %% "pureconfig-cats" % pureconfigVersion
+    "com.typesafe.scala-logging" %% "scala-logging"            % scalaLoggingVersion,
+    "co.fs2"                     %% "fs2-core"                 % fs2Version,
+    "org.lyranthe.fs2-grpc"      %% "java-runtime"             % fs2GrpcVersion,
+    "ch.qos.logback"              % "logback-classic"          % logbackVersion,
+    "net.logstash.logback"        % "logstash-logback-encoder" % logbackJsonVersion,
+    "com.github.pureconfig"      %% "pureconfig"               % pureconfigVersion,
+    "com.github.pureconfig"      %% "pureconfig-cats"          % pureconfigVersion
   )
 
   val fs2RabbitVersion = "3.0.1"

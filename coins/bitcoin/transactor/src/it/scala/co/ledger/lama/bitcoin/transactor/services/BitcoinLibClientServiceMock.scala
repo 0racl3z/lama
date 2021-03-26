@@ -27,6 +27,8 @@ class BitcoinLibClientServiceMock extends BitcoinLibClient {
       "hex",
       "hash",
       "witnessHash",
+      1234L,
+      9876L,
       None
     )
   )

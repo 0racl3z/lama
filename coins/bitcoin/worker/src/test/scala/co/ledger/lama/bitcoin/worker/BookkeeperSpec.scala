@@ -7,7 +7,6 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
 import co.ledger.lama.bitcoin.common.models.explorer.UnconfirmedTransaction
 import co.ledger.lama.bitcoin.common.models.interpreter.AccountAddress
-import co.ledger.lama.bitcoin.worker.services.Bookkeeper.BatchResult
 import co.ledger.lama.bitcoin.worker.services.{Bookkeeper, Keychain}
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.Btc
@@ -44,12 +43,10 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
           }
           .toMap
       ),
-      new InterpreterClientMock,
-      maxTxsToSavePerBatch = 100,
-      maxConcurrent = 1
+      new InterpreterClientMock
     )
 
-    val batchResults = bookkeeper
+    val addresses = bookkeeper
       .record[UnconfirmedTransaction](
         Btc,
         accountId,
@@ -58,7 +55,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
       )
       .unsafeRunSync()
 
-    batchResults.addresses.map(_.accountAddress) should contain.only("11", "12", "13")
+    addresses.map(_.accountAddress) should contain.only("11", "12", "13")
   }
 
   it should "add all transactions referencing an account's address" in {
@@ -75,12 +72,10 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     val bookkeeper = Bookkeeper(
       new Keychain(KeychainFixture.keychainClient(usedAndFreshAddresses)),
       explorerClient(transactions),
-      new InterpreterClientMock,
-      maxTxsToSavePerBatch = 100,
-      maxConcurrent = 1
+      new InterpreterClientMock
     )
 
-    val batchResults = bookkeeper
+    val addresses = bookkeeper
       .record[UnconfirmedTransaction](
         Btc,
         accountId,
@@ -89,7 +84,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
       )
       .unsafeRunSync()
 
-    batchResults.addresses
+    addresses
       .map(_.accountAddress) should contain only (transactions.keys.toList: _*)
   }
 
@@ -110,9 +105,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
           }
           .toMap
       ),
-      new InterpreterClientMock,
-      maxTxsToSavePerBatch = 100,
-      maxConcurrent = 1
+      new InterpreterClientMock
     )
 
     val _ = bookkeeper
@@ -143,9 +136,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     val bookkeeper = Bookkeeper(
       new Keychain(KeychainFixture.keychainClient(usedAndFreshAddresses)),
       explorerClient(transactions),
-      interpreter,
-      maxTxsToSavePerBatch = 100,
-      maxConcurrent = 1
+      interpreter
     )
 
     val _ = bookkeeper
@@ -171,12 +162,10 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
       explorerClient(
         mempool = Map.empty
       ),
-      new InterpreterClientMock,
-      maxTxsToSavePerBatch = 100,
-      maxConcurrent = 1
+      new InterpreterClientMock
     )
 
-    val batches = bookkeeper
+    val addresses = bookkeeper
       .record[UnconfirmedTransaction](
         Btc,
         accountId,
@@ -185,7 +174,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
       )
       .unsafeRunSync()
 
-    batches shouldBe BatchResult(List.empty[AccountAddress], maxBlock = None)
+    addresses shouldBe List.empty[AccountAddress]
   }
 
 }

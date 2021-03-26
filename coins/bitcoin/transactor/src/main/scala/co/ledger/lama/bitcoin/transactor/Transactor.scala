@@ -11,10 +11,10 @@ import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, Invali
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.bitcoin.transactor.Transactor.ValidationResult
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
-import co.ledger.lama.bitcoin.transactor.models.RawTxAndUtxos
+import co.ledger.lama.bitcoin.transactor.models.RawTxWithChangeFeesAndUtxos
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
 import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, TransactionBytes}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
 import io.circe.syntax._
@@ -27,7 +27,7 @@ class Transactor(
     keychainClient: KeychainClient,
     interpreterClient: InterpreterClient,
     conf: TransactorConfig
-) extends IOLogging {
+) extends DefaultContextLogging {
 
   def createTransaction(
       accountId: UUID,
@@ -100,12 +100,15 @@ class Transactor(
         estimatedFeePerUtxo,
         if (maxUtxos == 0) conf.maxUtxos else maxUtxos
       )
+
+      changeOutput = PrepareTxOutput(changeAddress.accountAddress, response.change, Some(changeAddress.derivation.toList))
     } yield {
       CreateTransactionResponse(
         response.rawTx.hex,
         response.rawTx.hash,
         response.rawTx.witnessHash,
         response.utxos,
+        outputs.appended(changeOutput),
         estimatedFee,
         estimatedFeePerKb
       )
@@ -202,7 +205,7 @@ class Transactor(
       feesPerUtxo: BigInt,
       maxUtxos: Int,
       retryCount: Int = 5
-  ): IO[RawTxAndUtxos] =
+  ): IO[RawTxWithChangeFeesAndUtxos] =
     for {
       _ <-
         if (retryCount <= 0)
@@ -244,12 +247,14 @@ class Transactor(
 
       rawTransactionAndUtxos <- response.notEnoughUtxo.fold(
         IO(
-          RawTxAndUtxos(
+          RawTxWithChangeFeesAndUtxos(
             RawTransaction(
               response.hex,
               response.hash,
               response.witnessHash
             ),
+            response.changeAmount,
+            response.totalFees,
             selectedUtxos
           )
         )

@@ -7,7 +7,7 @@ import cats.data.Kleisli
 import cats.effect.ExitCase.{Canceled, Completed, Error}
 import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.ResourceUtils.retriableResource
 import dev.profunktor.fs2rabbit.config.declaration.DeclarationQueueConfig
 import dev.profunktor.fs2rabbit.config.deletion.{DeletionExchangeConfig, DeletionQueueConfig}
@@ -20,7 +20,7 @@ import io.circe.parser.parse
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder}
 
-object RabbitUtils extends IOLogging {
+object RabbitUtils extends DefaultContextLogging {
 
   trait AutoAckMessage[A] {
     def unwrap[B](consumer: A => IO[B]): IO[B]
