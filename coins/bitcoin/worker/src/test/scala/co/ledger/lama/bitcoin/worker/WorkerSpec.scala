@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.mocks.InterpreterClientMock
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
 import co.ledger.lama.bitcoin.common.models.explorer.Block
-import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{End, QueueInputOps, registered}
+import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{registered, End, QueueInputOps}
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, SyncEventService}
 import co.ledger.lama.common.models.Status.Registered
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
@@ -15,10 +15,12 @@ import co.ledger.lama.common.utils.IOAssertion
 import fs2.concurrent.Queue
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
 import java.time.Instant
 import java.util.UUID
-
 import co.ledger.lama.bitcoin.common.models.interpreter.TransactionView
+import co.ledger.lama.common.utils.RabbitUtils.AutoAckMessage
+import dev.profunktor.fs2rabbit.model.DeliveryTag
 
 import scala.concurrent.ExecutionContext
 
@@ -181,10 +183,10 @@ object SyncEventServiceFixture {
       receiving: Queue[IO, Option[(AccountIdentifier, WorkableEvent[Block])]]
   ): SyncEventService = {
     new SyncEventService {
-      override def consumeWorkerMessages: fs2.Stream[IO, WorkerMessage[Block]] = {
+      override def consumeWorkerMessages: fs2.Stream[IO, AutoAckMessage[WorkerMessage[Block]]] = {
         receiving.dequeue.unNoneTerminate
           .map { case (accountIdentifier, event) =>
-            WorkerMessage(accountIdentifier, event)
+            AutoAckMessage(WorkerMessage(accountIdentifier, event), DeliveryTag(0L))(_ => IO.unit)
           }
       }
 

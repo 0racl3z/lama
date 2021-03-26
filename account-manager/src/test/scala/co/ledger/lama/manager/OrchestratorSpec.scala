@@ -2,11 +2,12 @@ package co.ledger.lama.manager
 
 import java.time.Instant
 import java.util.UUID
-
 import cats.effect.{ContextShift, IO, Timer}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.utils.IOAssertion
+import co.ledger.lama.common.utils.RabbitUtils.AutoAckMessage
+import dev.profunktor.fs2rabbit.model.DeliveryTag
 import fs2.{Pipe, Stream}
 import io.circe.JsonObject
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -86,16 +87,22 @@ class FakeSyncEventTask(workerMessages: Seq[WorkerMessage[JsonObject]]) extends 
       )
     }
 
-  def reportableMessages: Stream[IO, ReportMessage[JsonObject]] =
+  def reportableMessages: Stream[IO, AutoAckMessage[ReportMessage[JsonObject]]] =
     Stream.emits(
       workerMessages.map(message =>
-        ReportMessage(message.account, message.event.asReportableSuccessEvent(None))
+        AutoAckMessage(
+          ReportMessage(message.account, message.event.asReportableSuccessEvent(None)), DeliveryTag(0L)
+        )(_ => IO.unit)
       )
     )
 
-  def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit] =
+  def reportMessagePipe: Pipe[IO, AutoAckMessage[ReportMessage[JsonObject]], Unit] =
     _.evalMap { e =>
-      IO.pure { reportedMessages = reportedMessages :+ e }
+      e.unwrap { msg =>
+        IO.pure {
+          reportedMessages = reportedMessages :+ msg
+        }
+      }
     }
 
   def triggerableEvents: Stream[IO, TriggerableEvent[JsonObject]] =
